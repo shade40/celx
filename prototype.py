@@ -1,11 +1,21 @@
+"""A prototype celx browser.
+
+Limitations (to be fixed after prototype):
+
+- Blocking requests
+- Little to no error handling
+- Some _questionable_ code style (seriously, wtf is the nesting in `parse_callback`
+"""
+
+import re
 from sys import argv
-from typing import Any
+from typing import Any, Callable, Literal
 
 from textwrap import indent, dedent
 import xml.etree.cElementTree as ET
 from urllib.parse import urlparse
 
-from requests import Session
+from requests import Session, Response
 from celadon import Application, Page, widgets, Widget, load_rules
 
 WIDGET_TYPES = {
@@ -20,6 +30,8 @@ STYLE_TEMPLATE = """\
 
 
 def parse_rules(text: str, query: str | None = None) -> dict[str, Any]:
+    """Parses a block of YAML rules into a dictionary."""
+
     if query is None:
         style = dedent(text)
     else:
@@ -30,16 +42,148 @@ def parse_rules(text: str, query: str | None = None) -> dict[str, Any]:
     return load_rules(style)
 
 
+def parse_callback(value: str) -> Callable[[Widget], None]:
+    """Parses a callback descriptor string into a callable.
+
+    Current keywords & associated arguments:
+
+    - GET(endpoint): Sends a GET request to `endpoint`, stores response text in `result`
+
+    - POST(container?, endpoint): Serializes `container` and sends it as a POST request
+        to endpoint, storing its response text in `result`.
+
+    - swap(where?, target): Parses the XML in `result` as a widget, and replaces some
+        part of `target` with it:
+
+            where `where` in
+
+            in => target.update_children
+            before => target.parent.replace(target, offset=-1)
+            after => target.parent.replace(target, offset=1)
+    """
+    lines = re.split("[;\n]", value)
+
+    instructions = []
+
+    for line in lines:
+        ident, *args = line.strip().split(" ")
+
+        if ident == "GET":
+            instructions.append(("get", (args[0],)))
+
+        elif ident == "POST":
+            if len(args) == 2:
+                container, endpoint = args
+            else:
+                container = None
+                endpoint = args[0]
+
+            instructions.append(("post", (endpoint, container)))
+
+        elif ident == "swap":
+            if len(args) == 2:
+                where, target = args
+            else:
+                where = None
+                target = args[0]
+
+            instructions.append(("swap", (target, where)))
+
+        else:
+            raise ValueError(f"unknown ident {ident!r} in {line!r}")
+
+    def _callback(self: Widget) -> bool:
+        result = None
+        app = self.app
+
+        def _get(endpoint: str) -> str:
+            return app.http_get(endpoint)
+
+        def _post(endpoint: str, container: Widget | None = None) -> str:
+            body = self.parent
+
+            if container is not None:
+                body = app.find(container)
+
+            json = body.serialize()
+
+            return app.http_post(endpoint, json)
+
+        def _swap(
+            target: str, where: Literal["in", "before", "after"] | None = None
+        ) -> None:
+            if result is None:
+                raise ValueError("no result to swap with")
+
+            target_widget = app.find(target)
+
+            tree = ET.fromstring(result)
+            widget = parse_widget(tree)[0]
+
+            if where is None:
+                target_widget.parent.replace(target_widget, widget)
+                return
+
+            if where == "in":
+                target_widget.update_children([widget])
+                return
+
+            if where == "before":
+                target_widget.parent.replace(target_widget, widget, offset=-1)
+                return
+
+            if where == "after":
+                target_widget.parent.replace(target_widget, widget, offset=1)
+                return
+
+        for instruction in instructions:
+            func_name, args = instruction
+
+            func = {
+                "get": _get,
+                "post": _post,
+                "swap": _swap,
+            }[func_name]
+
+            result = func(*args)
+
+        return True
+
+    return _callback
+
+
 def parse_widget(node) -> tuple[Widget, dict[str, Any]]:
+    """Parses a widget out of an XML node.
+
+    This also adjusts certain values given in the node's attributes:
+
+    - groups: Replace `value` with `value.split(" ")`
+    - on-*: Replace `value` with `parse_callback(value)`
+
+    Returns:
+        The resulting widget, as well as any styling the markup contained.
+    """
+
     cls = WIDGET_TYPES[node.tag]
 
-    if "groups" in node.attrib:
-        node.attrib["groups"] = node.attrib["groups"].split(" ")
+    init = {}
+
+    for key, value in node.attrib.items():
+        if key == "groups":
+            init["groups"] = tuple(value.split(" "))
+            continue
+
+        if key.startswith("on-"):
+            key = key.replace("-", "_")
+            init[key] = [parse_callback(value)]
+            continue
+
+        init[key] = value
 
     if node.text is not None and node.text.strip() != "":
-        widget = cls(node.text.strip(), **node.attrib)
+        widget = cls(node.text.strip(), **init)
     else:
-        widget = cls(**node.attrib)
+        widget = cls(**init)
 
     query = widget.as_query()
     rules = {}
@@ -58,6 +202,12 @@ def parse_widget(node) -> tuple[Widget, dict[str, Any]]:
 
 
 def parse_page(text: str) -> Page:
+    """Parses a page out of the given text.
+
+    This will also handle page-local style markup, but raises an error for any tag other
+    than `page` and `style`.
+    """
+
     root = ET.fromstring(text)
 
     for first in root:
@@ -82,28 +232,65 @@ def parse_page(text: str) -> Page:
 
 
 class HttpApplication(Application):
+    """A Celadon application with HTTP capabilities."""
+
     def __init__(self, domain: str, **app_args: Any) -> None:
         super().__init__(**app_args)
 
         self._url = urlparse(domain)
         self._session = Session()
 
-    def route(self, destination: str) -> None:
-        if destination.startswith("/"):
-            destination = self._url.scheme + "://" + self._url.netloc + destination
+    @property
+    def session(self) -> Session:
+        return self._session
 
-        url = urlparse(destination)
-
-        if url.netloc != self._url.netloc:
-            self._url = url
-
-        resp = self._session.get(destination)
+    def _handle_resp_errors(self, resp: Response) -> None:
+        """Raises an error if the response isn't successful."""
 
         if not 200 <= resp.status_code < 300:
             self.stop()
             resp.raise_for_status()
 
-        page = parse_page(resp.text)
+    def _prefix_endpoint(self, endpoint: str) -> str:
+        """Prefixes hierarchy-only endpoints with the current url and its scheme."""
+
+        if endpoint.startswith("/"):
+            return self._url.scheme + "://" + self._url.netloc + endpoint
+
+        return endpoint
+
+    def http_get(self, endpoint: str) -> str | None:
+        """Gets the given endpoint, returns the response's text."""
+
+        endpoint = self._prefix_endpoint(endpoint)
+
+        resp = self._session.get(endpoint)
+        self._handle_resp_errors(resp)
+
+        return resp.text
+
+    def http_post(self, endpoint: str, body: dict[str, str]) -> str | None:
+        """Posts `body` to the given endpoint, returns the response's text."""
+
+        endpoint = self._prefix_endpoint(endpoint)
+
+        resp = self._session.post(endpoint, json=body)
+        self._handle_resp_errors(resp)
+
+        return resp.text
+
+    def route(self, destination: str) -> None:
+        """Routes to the given URL."""
+
+        destination = self._prefix_endpoint(destination)
+
+        xml = self.http_get(destination)
+        url = urlparse(destination)
+
+        if url.netloc != self._url.netloc:
+            self._url = url
+
+        page = parse_page(xml)
         page.route_name = url.path
 
         # TODO: We don't have to request the page every time we go to it
