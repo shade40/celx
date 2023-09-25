@@ -42,6 +42,7 @@ def parse_rules(text: str, query: str | None = None) -> dict[str, Any]:
     return load_rules(style)
 
 
+# There is massive repetition in this function, so we should fix that.
 def parse_callback(value: str) -> Callable[[Widget], None]:
     """Parses a callback descriptor string into a callable.
 
@@ -60,7 +61,10 @@ def parse_callback(value: str) -> Callable[[Widget], None]:
             in => target.update_children
             before => target.parent.replace(target, offset=-1)
             after => target.parent.replace(target, offset=1)
+
+    - insert|append(where?, target): Adds `result` without replacing.
     """
+
     lines = re.split("[;\n]", value)
 
     instructions = []
@@ -88,6 +92,16 @@ def parse_callback(value: str) -> Callable[[Widget], None]:
                 target = args[0]
 
             instructions.append(("swap", (target, where)))
+
+        elif ident == "insert":
+            where, target = args
+
+            instructions.append(("insert", (target, where)))
+
+        elif ident == "append":
+            where, target = args
+
+            instructions.append(("append", (target, where)))
 
         else:
             raise ValueError(f"unknown ident {ident!r} in {line!r}")
@@ -136,6 +150,51 @@ def parse_callback(value: str) -> Callable[[Widget], None]:
                 target_widget.parent.replace(target_widget, widget, offset=1)
                 return
 
+        def _insert(target: str, where: Literal["in", "before", "after"]) -> None:
+            if result is None:
+                raise ValueError("no result to swap with")
+
+            target_widget = app.find(target)
+
+            tree = ET.fromstring(result)
+            widget = parse_widget(tree)[0]
+
+            if where == "in":
+                target_widget.insert(0, widget)
+                return
+
+            if where == "before":
+                index = target_widget.parent.children.index(target_widget)
+                target_widget.parent.insert(index, widget)
+                return
+
+            if where == "after":
+                target_widget.parent.append(widget)
+                return
+
+        def _append(target: str, where: Literal["in", "before", "after"]) -> None:
+            if result is None:
+                raise ValueError("no result to swap with")
+
+            target_widget = app.find(target)
+
+            tree = ET.fromstring(result)
+            widget = parse_widget(tree)[0]
+
+            if where == "in":
+                target_widget.append(0, widget)
+                return
+
+            if where == "before":
+                index = target_widget.parent.children.index(target_widget)
+                target_widget.parent.append(index, widget)
+                return
+
+            if where == "after":
+                index = target_widget.parent.children.index(target_widget)
+                target_widget.parent.insert(index, widget)
+                return
+
         for instruction in instructions:
             func_name, args = instruction
 
@@ -143,6 +202,8 @@ def parse_callback(value: str) -> Callable[[Widget], None]:
                 "get": _get,
                 "post": _post,
                 "swap": _swap,
+                "insert": _insert,
+                "append": _append,
             }[func_name]
 
             result = func(*args)
@@ -239,6 +300,7 @@ class HttpApplication(Application):
 
         self._url = urlparse(domain)
         self._session = Session()
+        self.route(self._url.geturl())
 
     @property
     def session(self) -> Session:
@@ -296,6 +358,7 @@ class HttpApplication(Application):
         # TODO: We don't have to request the page every time we go to it
         self.append(page)
         self._page = page
+        self._mouse_target = self._page[0]
 
         if page.route_name == "/":
             self._terminal.set_title(self.title)
