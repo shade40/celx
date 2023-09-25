@@ -31,7 +31,7 @@ classifiers = [
   "Topic :: Terminals",
   "Topic :: Text Processing :: Markup",
 ]
-dependencies = ["sh40-celadon", "requests", "lua"]
+dependencies = ["sh40-celadon", "requests"]
 dynamic = ["version"]
 
 [project.urls]
@@ -59,8 +59,8 @@ dependencies = [
 
 [tool.hatch.envs.test]
 dependencies = [
-  "sh40-celadon",
-  "lupa",
+  "mypy",
+  "pylint",
   "pytest",
   "pytest-cov",
 ]
