@@ -2,7 +2,7 @@
 
 ## celx
 
-A TUI framework built for hypermedia.
+A modern TUI framework powered by hypermedia served over remote HTTP servers.
 
 ```
 pip install sh40-celx
