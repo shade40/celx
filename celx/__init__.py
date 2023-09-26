@@ -140,19 +140,20 @@ def parse_callback(value: str) -> Callable[[Widget], None]:
 
             if where is None:
                 target_widget.parent.replace(target_widget, widget)
-                return
 
-            if where == "in":
+            elif where == "in":
                 target_widget.update_children([widget])
-                return
 
-            if where == "before":
+            elif where == "before":
                 target_widget.parent.replace(target_widget, widget, offset=-1)
-                return
 
-            if where == "after":
+            elif where == "after":
                 target_widget.parent.replace(target_widget, widget, offset=1)
-                return
+
+            # TODO: This is hacky as hell, but we need it for widgets to load in styles
+            parent = widget.parent
+            self.app._init_widget(widget)
+            widget.parent = parent
 
         def _insert(target: str, where: Literal["in", "before", "after"]) -> None:
             if result is None:
