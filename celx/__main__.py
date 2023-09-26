@@ -13,9 +13,9 @@ def main() -> None:
 
     subs = parser.add_subparsers(required=True)
 
-    parser_run = subs.add_parser("run")
-    parser_run.add_argument("endpoint", help="The endpoint to connect to.")
-    parser_run.set_defaults(func=run)
+    run_command = subs.add_parser("run")
+    run_command.set_defaults(func=run)
+    run_command.add_argument("endpoint", help="The endpoint to connect to.")
 
     args = parser.parse_args()
     command = args.func
@@ -24,7 +24,6 @@ def main() -> None:
     del opts["func"]
 
     command(**vars(args))
-    return
 
 
 if __name__ == "__main__":

@@ -5,6 +5,8 @@ Limitations (to be fixed after prototype):
 - Blocking requests
 - Little to no error handling
 - Some _questionable_ code style (seriously, wtf is the nesting in `parse_callback`
+- No support for PUT, PATCH or DELETE
+- No support for sending query parameters in GET requests
 """
 
 import re

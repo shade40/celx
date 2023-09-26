@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sh40-celx"
-description = "A TUI framework built for hypermedia."
+description = "A modern terminal UI framework powered by hypermedia served over HTTP."
 readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"
@@ -73,6 +73,11 @@ upload = "hatch build && twine upload dist/* && hatch clean"
 
 [[tool.hatch.envs.test.matrix]]
 python = ["38", "39", "310", "311"]
+
+[tool.pylint]
+fail-under = 9.9
+disable = "fixme, missing-module-docstring, no-member"
+good-names = ["i", "j", "k", "ex", "Run", "_", "x" ,"y", "fd"]
 
 [tool.coverage.run]
 branch = true
