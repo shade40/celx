@@ -2,7 +2,7 @@
 
 ## celx
 
-A modern TUI framework powered by hypermedia served over remote HTTP servers.
+A modern terminal UI framework powered by hypermedia served over HTTP.
 
 ```
 pip install sh40-celx
