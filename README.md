@@ -12,9 +12,9 @@ See [/server](https://github.com/shade40/celx/tree/main/server/) for an example 
 
 ### Quickstart
 
-`celx` is a TUI application framework, inspired by [htmx](htmx.org). It emphasizes the usage of hypermedia
-as the engine of application state (HATEOAS), as an alternative to reactive client-side frameworks. `celx` apps are
-writtenas XML fragments, and communicated through the Hypertext Transfer Protocol.
+`celx` is a TUI application framework inspired by [htmx](htmx.org). It emphasizes the usage of hypermedia
+as the engine of application state (HATEOAS) as an alternative to reactive client-side frameworks. `celx` apps are
+written as XML fragments, and communicated through the Hypertext Transfer Protocol (HTTP).
 
 Let's start with a basic application index (running on `/`):
 
