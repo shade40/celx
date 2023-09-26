@@ -213,6 +213,8 @@ We will also create some example server applications to get you started with.
 
 ### See also
 
+- [Hypermedia Systems](https://hypermedia.systems): The primary inspiration for the library. A great book, available
+    as hard-copy, ebook or even for free.
 - [Celadon](https://github.com/shade40/celadon): The core of the framework, providing the widget & styling
     systems and the application runtime
 - [Zenith](https://github.com/shade40/zenith): The inline-markup language used by the framework, which can
