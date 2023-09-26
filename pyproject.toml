@@ -39,6 +39,9 @@ Documentation = "https://github.com/shade40/celx#readme"
 Issues = "https://github.com/shade40/celx/issues"
 Source = "https://github.com/shade40/celx"
 
+[project.scripts]
+celx = "celx.__main__:main"
+
 [tool.hatch.version]
 path = "celx/__about__.py"
 

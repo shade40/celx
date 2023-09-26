@@ -9,5 +9,5 @@ pip install .  # or `hatch env` to run in an env
 flask --app celx-server run --port 8080
 
 # In another terminal instance
-python3 -m celx run 127.0.0.1:8080
+celx run 127.0.0.1:8080
 ```
