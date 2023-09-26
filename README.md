@@ -156,6 +156,12 @@ a good thing?
   app takes as much as writing in the URL its served at, and pressing enter. No further installation,
   no 'clone my repo, download my build tool and execute these commands', not even a `pip install`.
 
+- Running a celx & html of the same backend on the same server
+
+  Since every bit of state is handled on the backend, you can simply send out different formats to represent
+  the same interfaces based on who is listening. In the (near) future celx will send a specific header
+  to tell the server to send celx' XML instead of HTML.
+
 #### A sophisticated styling engine
 
 As shown above, each `<style>` tag is scoped to its parent widget. Think of this as a less error-prone
