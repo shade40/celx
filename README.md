@@ -8,18 +8,7 @@ A modern terminal UI framework powered by hypermedia served over HTTP.
 pip install sh40-celx
 ```
 
-To see an example server:
-
-```bash
-cd server
-
-pip install .
-
-flask --app celx-server run --port 8080
-
-# from another terminal
-python3 -m celx run 127.0.0.1:8080
-```
+See [/server](https://github.com/shade40/celx/tree/main/server/) for an example server & app.
 
 ### Quickstart
 
