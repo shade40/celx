@@ -106,7 +106,7 @@ link = "ui.primary"
 PAGE = f"""
 <celx version='0'>
     <page>
-        <style>
+        <styles>
             Text:
                 .pad:
                     width: null
@@ -132,7 +132,7 @@ PAGE = f"""
 
                     /hover:
                         content_style: {link} underline bold
-        </style>
+        </styles>
         <tower eid='root'>
             <row eid='header'>
                 <link to="/">[bold]❒ Welcome! ❒[/]</link>
@@ -145,6 +145,21 @@ PAGE = f"""
             <tower eid='body' group="center">
 {{body}}
             </tower>
+        </tower>
+        <tower>
+            <styles>
+                positioning: static
+                height: 7
+                width: 0.6
+
+                frame: padded
+                fill_style: '@ui.panel1*0.9'
+
+                '> Text':
+                    fill_style: ''
+            </styles>
+            <text>[bold]Title</text>
+            <text>[dim]Some body content...</text>
         </tower>
     </page>
 </celx>
@@ -176,13 +191,13 @@ def create_app(test_config=None):
     def blog():
         return create_page(
             f"""
-            <style> alignment: [center, center] </style>
+            <styles> alignment: [center, center] </styles>
             <text>
                 This is actually a blog
-                <style>
+                <styles>
                     content_style: bold !gradient(76)
                     height: 2
-                </style>
+                </styles>
             </text>
             <text groups="h-fill of-auto">{LOREM}</text>
             """,
@@ -223,7 +238,7 @@ def create_app(test_config=None):
         return create_page(
             f"""
             <tower eid="questions">
-                <style>
+                <styles>
                     gap: 1
 
                     frame: light
@@ -236,17 +251,17 @@ def create_app(test_config=None):
 
                     '> .prompt':
                         height: 1
-                </style>
+                </styles>
             </tower>
             <tower eid="results">
-                <style> height: 1 </style>
+                <styles> height: 1 </styles>
             </tower>
             <row group="center">
                 <button on-submit='POST #questions /questions; swap in #results'>
                     Submit
                 </button>
                 <button on-submit='GET /questions; swap #questions'>Load</button>
-                <style> height: 1 </style>
+                <styles> height: 1 </styles>
             </row>""",
             subpage="form",
         )
@@ -254,6 +269,8 @@ def create_app(test_config=None):
     @app.route("/new-button")
     def new_button():
         import time
+
+        time.sleep(1)
 
         return f"<button>{time.strftime('%c')}</button>"
 
@@ -272,17 +289,17 @@ def create_app(test_config=None):
         tile = """\
         <text>
             [0]
-            <style>
+            <styles>
                 width: 10
                 height: 5
                 fill_style: "@{color}"
-            </style>
+            </styles>
         </text>"""
 
         return create_page(
             f"""
             <tower>
-                <style>
+                <styles>
                     gap: 1
                     fallback_gap: 1
                     frame: padded
@@ -295,7 +312,7 @@ def create_app(test_config=None):
                         fallback_gap: 1
                         height: 5
 
-                </style>
+                </styles>
                 <row group='color-row'>
                     {tile.format(color='celadon')}
                     {tile.format(color='zenith')}
