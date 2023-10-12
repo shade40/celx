@@ -105,7 +105,7 @@ link = "ui.primary"
 
 PAGE = f"""
 <celx version='0'>
-    <page>
+    <page title='{{title}}'>
         <styles>
             Text:
                 .pad:
@@ -135,7 +135,7 @@ PAGE = f"""
         </styles>
         <tower eid='root'>
             <row eid='header'>
-                <link to="/">[bold]❒ Welcome! ❒[/]</link>
+                <link eid="title" to="/">[bold]❒ Welcome! ❒[/]</link>
                 <text group="pad">[white]</text>
                 <link {{about}}>About</link>
                 <link {{blog}}>Blog</link>
@@ -146,21 +146,6 @@ PAGE = f"""
 {{body}}
             </tower>
         </tower>
-        <tower>
-            <styles>
-                positioning: static
-                height: 7
-                width: 0.6
-
-                frame: padded
-                fill_style: '@ui.panel1*0.9'
-
-                '> Text':
-                    fill_style: ''
-            </styles>
-            <text>[bold]Title</text>
-            <text>[dim]Some body content...</text>
-        </tower>
     </page>
 </celx>
 """
@@ -169,11 +154,15 @@ VALUE = [""]
 
 
 def create_page(body: str, subpage: str | None = None) -> Response:
+    title = (subpage or "").title()
+
     subpages = {page: "" for page in ["about", "blog", "form", "buttons"]} | {
         subpage: 'group="active"'
     }
 
-    return Response(PAGE.format(body=body, **subpages), mimetype="text/xml")
+    return Response(
+        PAGE.format(title=title, body=body, **subpages), mimetype="text/xml"
+    )
 
 
 def create_app(test_config=None):
@@ -181,7 +170,24 @@ def create_app(test_config=None):
 
     @app.route("/")
     def index():
-        return create_page("<text>This is the index</text>")
+        return create_page(
+            """
+        <styles>
+            alignment: [center, center]
+        </styles>
+        <text>This is the index</text>
+        <lua> test = "hello" </lua>
+        <row>
+            <styles> height: 3 </styles>
+            <lua> count = 5 </lua>
+            <button eid='hey'>
+                Counter: $outer.count $outer.outer.test
+                <lua src="/static/counter.lua"></lua>
+            </button>
+            <text eid='hoo'>Counter: $outer.count</text>
+        </row>
+        """
+        )
 
     @app.route("/about")
     def about():
@@ -199,7 +205,9 @@ def create_app(test_config=None):
                     height: 2
                 </styles>
             </text>
-            <text groups="h-fill of-auto">{LOREM}</text>
+            <text groups="h-fill of-auto">
+                {LOREM}
+            </text>
             """,
             subpage="blog",
         )
@@ -330,5 +338,10 @@ def create_app(test_config=None):
                 </row>
             </tower>"""
         )
+
+    @app.route("/grid")
+    def grid():
+        buttons = "\n".join("<button group='fill'>test</button>" for _ in range(10))
+        return create_page("\n".join(f"<row>{buttons}</row>" for _ in range(10)))
 
     return app

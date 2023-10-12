@@ -9,6 +9,7 @@ from celadon import Application, Page, Widget, Container
 from requests import Session, Response
 
 from .parsing import HTTPMethod, Instruction, Verb, TreeMethod, parse_widget, parse_page
+from .lua import lua, init_runtime
 
 
 __all__ = ["HttpApplication"]
@@ -25,6 +26,8 @@ def threaded(func: Callable[..., None]) -> Callable[..., None]:
 class HttpApplication(Application):
     def __init__(self, domain: str, **app_args: Any) -> None:
         super().__init__(**app_args)
+
+        init_runtime(lua, self)
 
         self._page = Page()
         self._url = urlparse(domain)
@@ -87,7 +90,20 @@ class HttpApplication(Application):
             if url.netloc != self._url.netloc:
                 self._url = url
 
-            handler(ElementTree(resp.text))
+            tree = ElementTree(resp.text)
+
+            for sourceable in ["styles", "lua"]:
+                for node in tree.findall(f".//{sourceable}[@src]"):
+                    resp = self._session.get(self._prefix_endpoint(node.attrib["src"]))
+
+                    if not 200 <= resp.status_code < 300:
+                        self.stop()
+                        resp.raise_for_status()
+
+                    node.text = resp.text
+                    del node.attrib["src"]
+
+            return handler(tree)
 
         thread = Thread(target=_execute)
         thread.start()
@@ -97,7 +113,12 @@ class HttpApplication(Application):
     def _xml_page_route(self, node: Element) -> None:
         """Routes to a page loaded from the given XML."""
 
-        page = parse_page(node)
+        try:
+            page = parse_page(node)
+        except Exception as exc:
+            self._error(exc)
+            return
+
         page.route_name = self._url.path
 
         # TODO: We don't have to request the page every time we go to it
