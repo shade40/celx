@@ -1,0 +1,24 @@
+Text:
+  .pad:
+    width: null
+
+Tower#root:
+  alignment: [center, center]
+  frame: padded
+
+Row#header:
+  height: 2
+  gap: 3
+  fallback_gap: 3
+
+Link:
+  content_style: ui.primary
+
+  /hover:
+    content_style: ui.primary bold
+
+  .active:
+    content_style: ui.primary underline
+
+    /hover:
+      content_style: ui.primary underline bold

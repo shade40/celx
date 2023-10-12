@@ -1,0 +1,18 @@
+{{ define "counter" }}
+<button>
+    Current value: $count
+    <lua>
+        count = 0
+
+        function on_submit()
+            count = count + 1
+        end
+
+        function pre_content()
+            if count >= 10 then
+                styles.content = 'red'
+            end
+        end
+    </lua>
+</button>
+{{ end }}

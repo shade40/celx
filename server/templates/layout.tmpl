@@ -1,0 +1,25 @@
+{{ define "header" }}
+<row eid="header">
+    <text>[~/]Welcome!</text>
+    <text group="pad">[0]</text>
+    {{ range .Pages }}
+        {{ if eq . "" }}
+            {{ continue }}
+        {{ end }}
+        <link group={{ if eq . $.Page }} "active" {{ else }} "" {{ end }}>{{ . }}</link>
+    {{ end }}
+</row>
+{{ end }}
+
+<celx version="0">
+    <page title={{ if eq .Page "home" }} "" {{ else }} "{{ .Page }}" {{ end }}>
+        <styles src="/static/styles.yaml" />
+        <tower eid="root">
+            <lua src="/static/script.lua" />
+            {{ template "header" . }}
+            <tower eid="body">
+                {{ template "body" . }}
+            </tower>
+        </tower>
+    </page>
+</celx>

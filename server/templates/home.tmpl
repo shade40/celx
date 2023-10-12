@@ -1,0 +1,11 @@
+{{ define "body" }}
+    <styles> alignment: [center, center] </styles>
+    <row eid="data">
+        {{ template "counter" . }}
+        {{ template "counter" . }}
+        {{ template "counter" . }}
+        {{ template "counter" . }}
+        {{ template "counter" . }}
+    </row>
+    <button on-submit="GET /; select #data; swap #data">Reset</button>
+{{ end }}
