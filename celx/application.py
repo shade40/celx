@@ -145,6 +145,17 @@ class HttpApplication(Application):
         def _set_result(xml: ElementTree) -> None:
             nonlocal result
 
+            # Drill down to find the first widget, pass that on instead.
+            if xml.tag == "celx":
+                for node in xml.findall("./page//"):
+                    if node.tag not in ["styles", "lua"]:
+                        xml = node
+                        break
+
+                else:
+                    self._error(ValueError("no widget in response"))
+                    return
+
             result = parse_widget(xml)[0]
 
         self._current_instructions.append(instructions)
