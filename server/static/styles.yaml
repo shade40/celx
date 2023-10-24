@@ -1,3 +1,19 @@
+Palette:
+  /main:
+    primary: zenith
+
+  /error:
+    primary: red
+
+Terminal.eight-bit:
+  \*> Palette:
+    /main:
+      panel1: 38;5;233
+
+    /main-light:
+      primary: dark
+      panel1:
+
 Text:
   .pad:
     width: null
@@ -12,13 +28,13 @@ Row#header:
   fallback_gap: 3
 
 Link:
-  content_style: ui.primary
+  content_style: .primary
 
   /hover:
-    content_style: ui.primary bold
+    content_style: .primary bold
 
   .active:
-    content_style: ui.primary underline
+    content_style: .primary underline
 
     /hover:
-      content_style: ui.primary underline bold
+      content_style: .primary underline bold
