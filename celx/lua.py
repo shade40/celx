@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from lupa import LuaRuntime
 
-from celadon import Widget
+from lupa import LuaRuntime
+from celadon import Widget, widgets
 from celadon.style_map import StyleMap
 from zenith import zml_alias, zml_macro
 
 if TYPE_CHECKING:
     from .application import HttpApplication
+
+WIDGET_TYPES = {
+    key.lower(): value
+    for key, value in vars(widgets).items()
+    if isinstance(value, type) and issubclass(value, Widget)
+}
 
 
 def _attr_filter(obj, attr, is_setting):
@@ -49,6 +55,60 @@ def init_runtime(runtime: LuaRuntime, application: "HttpApplication") -> None:
         _inner.__name__ = name.replace(" ", "_")
         zml_macro(_inner)
 
+    def _confirm(title: str, body: str, callback: Callable[[bool], None]) -> None:
+        dialogue = widgets.Dialogue(
+            widgets.Text(title, group="title"),
+            widgets.Text(body, group="body"),
+            widgets.Row(
+                widgets.Button(
+                    "Confirm",
+                    on_submit=[
+                        lambda self: (dialogue.remove_from_parent(), callback(True))
+                        and False
+                    ],
+                ),
+                widgets.Button(
+                    "Deny",
+                    on_submit=[
+                        lambda self: (dialogue.remove_from_parent(), callback(False))
+                        and False
+                    ],
+                ),
+                group="input",
+            ),
+        )
+        application.pin(dialogue)
+
+    def _alert(text: str) -> None:
+        dialogue = widgets.Dialogue(
+            widgets.Text(text, group="body"),
+            widgets.Row(
+                widgets.Button(
+                    "Close",
+                    on_submit=[lambda: dialogue.remove_from_parent()],
+                ),
+                group="input",
+            ),
+        )
+
+        application.pin(dialogue)
+
+    def _widget_factory(typ: Type[Widget]) -> None:
+        def _create(options) -> None:
+            args = []
+            kwargs = {}
+
+            for key, value in options.items():
+                if isinstance(key, int):
+                    args.append(value)
+                    continue
+
+                kwargs[key] = value
+
+            return typ(*args, **kwargs)
+
+        return _create
+
     lua.execute(
         """
         sandbox = {
@@ -87,6 +147,12 @@ def init_runtime(runtime: LuaRuntime, application: "HttpApplication") -> None:
     inject = lua.eval("function(obj, name) sandbox[name] = obj end")
 
     inject({"alias": zml_alias, "define": _zml_define}, "zml")
+    inject(_alert, "alert")
+    inject(_confirm, "confirm")
+    inject(
+        {key.title(): _widget_factory(value) for key, value in WIDGET_TYPES.items()},
+        "w",
+    )
     inject(_multi_find, "find")
     inject(LuaStyleWrapper, "styles")
 

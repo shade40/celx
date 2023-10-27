@@ -8,4 +8,20 @@
         {{ template "counter" . }}
     </row>
     <button on-submit="GET /; select #data; swap #data">Reset</button>
+    <button>
+        <lua>
+            on_submit = function()
+                confirm(
+                    "Are you sure?",
+                    "Deleting files is bad",
+                    function(success)
+                        if success then
+                            alert("deleted file")
+                        end
+                    end
+                )
+            end
+        </lua>
+        alert
+    </button>
 {{ end }}

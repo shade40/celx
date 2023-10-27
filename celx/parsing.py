@@ -6,16 +6,9 @@ from enum import Enum
 from typing import Any, Callable
 from textwrap import indent, dedent
 
-from celadon import Widget, widgets, load_rules, Page
+from celadon import Widget, load_rules, Page
 
-from .lua import lua
-
-WIDGET_TYPES = {
-    key.lower(): value
-    for key, value in vars(widgets).items()
-    if isinstance(value, type) and issubclass(value, Widget)
-}
-
+from .lua import lua, WIDGET_TYPES
 
 STYLE_TEMPLATE = """\
 {query}:
@@ -215,11 +208,16 @@ def parse_widget(node: Element) -> Widget:
 
     if (script_node := node.find("lua")) is not None:
         # Set up widget & styles globals
-        setup_scope = lua.eval(
-            LUA_SCRIPT_TEMPLATE.format(
-                indented_content=indent(dedent(script_node.text), 4 * " ")
-            )
+        code = LUA_SCRIPT_TEMPLATE.format(
+            indented_content=indent(dedent(script_node.text), 4 * " ")
         )
+
+        try:
+            setup_scope = lua.eval(code)
+
+        except Exception as err:
+            raise ValueError(code)
+
         scope = setup_scope(widget)
 
         lua.eval("function(widget, scope) sandbox.scopes[widget] = scope end")(
