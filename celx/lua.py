@@ -7,6 +7,8 @@ from celadon import Widget, widgets
 from celadon.style_map import StyleMap
 from zenith import zml_alias, zml_macro
 
+from .callbacks import parse_callback
+
 if TYPE_CHECKING:
     from .application import HttpApplication
 
@@ -55,6 +57,9 @@ def init_runtime(runtime: LuaRuntime, application: "HttpApplication") -> None:
         _inner.__name__ = name.replace(" ", "_")
         zml_macro(_inner)
 
+    def _chocl(descriptor: str) -> Callable[[Widget], None]:
+        return parse_callback(descriptor)
+
     def _confirm(title: str, body: str, callback: Callable[[bool], None]) -> None:
         dialogue = widgets.Dialogue(
             widgets.Text(title, group="title"),
@@ -86,6 +91,29 @@ def init_runtime(runtime: LuaRuntime, application: "HttpApplication") -> None:
                 widgets.Button(
                     "Close",
                     on_submit=[lambda: dialogue.remove_from_parent()],
+                ),
+                group="input",
+            ),
+        )
+
+        application.pin(dialogue)
+
+    def _prompt(
+        title: str, body: dict[int, Widget], callback: Callable[[Widget], None]
+    ) -> None:
+        dialogue = widgets.Dialogue(
+            widgets.Text(title, group="title"),
+            widgets.Tower(*body.values(), group="body"),
+            widgets.Row(
+                widgets.Button(
+                    "Submit",
+                    on_submit=[
+                        lambda self: (
+                            dialogue.remove_from_parent(),
+                            callback(self.parent),
+                        )
+                        and False
+                    ],
                 ),
                 group="input",
             ),
@@ -147,8 +175,11 @@ def init_runtime(runtime: LuaRuntime, application: "HttpApplication") -> None:
     inject = lua.eval("function(obj, name) sandbox[name] = obj end")
 
     inject({"alias": zml_alias, "define": _zml_define}, "zml")
+    inject(_chocl, "chocl")
     inject(_alert, "alert")
     inject(_confirm, "confirm")
+    inject(_prompt, "prompt")
+    inject(application.timeout, "timeout")
     inject(
         {key.title(): _widget_factory(value) for key, value in WIDGET_TYPES.items()},
         "w",

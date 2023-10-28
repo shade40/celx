@@ -7,21 +7,37 @@
         {{ template "counter" . }}
         {{ template "counter" . }}
     </row>
-    <button on-submit="GET /; select #data; swap #data">Reset</button>
-    <button>
-        <lua>
-            on_submit = function()
-                confirm(
-                    "Are you sure?",
-                    "Deleting files is bad",
-                    function(success)
-                        if success then
-                            alert("deleted file")
+    <row>
+        <button on-submit="GET /; select #data; swap #data">Reset</button>
+        <button>
+            <lua>
+                on_submit = function()
+                    confirm(
+                        "Are you sure?",
+                        "Deleting files is bad",
+                        function(success)
+                            if success then alert("deleted file") end
                         end
-                    end
-                )
-            end
-        </lua>
-        alert
-    </button>
+                    )
+                end
+            </lua>
+            alert
+        </button>
+        <button>
+            Add Prompt
+            <lua>
+                on_submit = function()
+                    prompt(
+                        "What is your opinion?",
+                        {
+                            w.Field{name="name", placeholder="Name..."},
+                            w.Checkbox{name="true", "Are you true?"},
+                            w.Checkbox{name="false", "Are you false?"},
+                        },
+                        chocl("POST /prompt; SWAP #data")
+                    )
+                end
+            </lua>
+        </button>
+    </row>
 {{ end }}

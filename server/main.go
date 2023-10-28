@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"text/template"
@@ -71,6 +73,22 @@ func (server Server) Buttons(w http.ResponseWriter, r *http.Request) {
 	templates.Execute(w, context)
 }
 
+func (server Server) PostPrompt(w http.ResponseWriter, r *http.Request) {
+	var obj interface{}
+
+	if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
+		log.Panic(err)
+	}
+
+	indent, err := json.MarshalIndent(obj, "", "  ")
+
+	if err != nil {
+		log.Panic(err)
+	}
+
+	fmt.Fprintf(w, "<text eid='data' groups='w-fill h-fill'>%v\n</text>", string(indent))
+}
+
 func main() {
 	server := Server{
 		[]string{"", "blog"},
@@ -84,6 +102,7 @@ func main() {
 
 	r.Get("/", server.Home)
 	r.Get("/blog", server.Blog)
+	r.Post("/prompt", server.PostPrompt)
 
 	http.ListenAndServe(":8080", r)
 }

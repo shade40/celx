@@ -8,7 +8,13 @@ from xml.etree.ElementTree import fromstring as ElementTree, Element
 from celadon import Application, Page, Widget, Container
 from requests import Session, Response
 
-from .parsing import HTTPMethod, Instruction, Verb, TreeMethod, parse_widget, parse_page
+from .parsing import parse_widget, parse_page
+from .callbacks import (
+    HTTPMethod,
+    Instruction,
+    Verb,
+    TreeMethod,
+)
 from .lua import lua, init_runtime
 
 
