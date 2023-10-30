@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from lupa import LuaRuntime
@@ -20,6 +21,8 @@ WIDGET_TYPES = {
 
 
 def _attr_filter(obj, attr, is_setting):
+    """Removes access to sunder and dunder attributes in Lua code."""
+
     if attr.startswith("_"):
         raise AttributeError("access denied")
 
@@ -27,12 +30,21 @@ def _attr_filter(obj, attr, is_setting):
 
 
 class LuaStyleWrapper:
+    """Wraps a widget's style object for nice Lua syntax.
+
+    ```
+    styles.content = 'red'
+    styles(some_widget).content = 'blue'
+    ```
+    """
+
     def __init__(self, widget: Widget) -> None:
         self._widget = widget
 
     def __setattr__(self, attr: str, value: Any) -> None:
         if attr == "_widget":
             super().__setattr__(attr, value)
+
             return
 
         self._widget.app.rule(
@@ -43,99 +55,134 @@ class LuaStyleWrapper:
         return self.__class__(widget)
 
 
-def init_runtime(runtime: LuaRuntime, application: "HttpApplication") -> None:
-    def _multi_find(selector: str, multiple: bool = False) -> Widget | list[Widget]:
-        if multiple:
-            return lua.table_from([*application.find_all(selector)])
+def _multi_find(
+    app: "HttpApplication", selector: str, multiple: bool = False
+) -> Widget | list[Widget]:
+    """Finds widgets from the application."""
 
-        return application.find(selector)
+    if multiple:
+        return lua.table_from([*app.find_all(selector)])
 
-    def _zml_define(name: str, macro: MacroType) -> None:
-        def _inner(*args) -> str:
-            return macro(*args)
+    return app.find(selector)
 
-        _inner.__name__ = name.replace(" ", "_")
-        zml_macro(_inner)
 
-    def _chocl(descriptor: str) -> Callable[[Widget], None]:
-        return parse_callback(descriptor)
+def _zml_define(name: str, macro: MacroType) -> None:
+    """Defines a macro in Lua."""
 
-    def _confirm(title: str, body: str, callback: Callable[[bool], None]) -> None:
-        dialogue = widgets.Dialogue(
-            widgets.Text(title, group="title"),
-            widgets.Text(body, group="body"),
-            widgets.Row(
-                widgets.Button(
-                    "Confirm",
-                    on_submit=[
-                        lambda self: (dialogue.remove_from_parent(), callback(True))
-                        and False
-                    ],
-                ),
-                widgets.Button(
-                    "Deny",
-                    on_submit=[
-                        lambda self: (dialogue.remove_from_parent(), callback(False))
-                        and False
-                    ],
-                ),
-                group="input",
+    def _inner(*args) -> str:
+        return macro(*args)
+
+    _inner.__name__ = name.replace(" ", "_")
+    zml_macro(_inner)
+
+
+def _chocl(descriptor: str) -> Callable[[Widget], None]:
+    """Provides Lua access to the celx hypermedia-oriented callback language."""
+
+    return parse_callback(descriptor)
+
+
+def _confirm(
+    app: "HttpApplication", title: str, body: str, callback: Callable[[bool], None]
+) -> None:
+    """Adds a confirmation dialogue."""
+
+    dialogue = widgets.Dialogue(
+        widgets.Text(title, group="title"),
+        widgets.Text(body, group="body"),
+        widgets.Row(
+            widgets.Button(
+                "Confirm",
+                on_submit=[
+                    lambda self: (dialogue.remove_from_parent(), callback(True))
+                    and False
+                ],
             ),
-        )
-        application.pin(dialogue)
-
-    def _alert(text: str) -> None:
-        dialogue = widgets.Dialogue(
-            widgets.Text(text, group="body"),
-            widgets.Row(
-                widgets.Button(
-                    "Close",
-                    on_submit=[lambda: dialogue.remove_from_parent()],
-                ),
-                group="input",
+            widgets.Button(
+                "Deny",
+                on_submit=[
+                    lambda self: (dialogue.remove_from_parent(), callback(False))
+                    and False
+                ],
             ),
-        )
+            group="input",
+        ),
+    )
+    app.pin(dialogue)
 
-        application.pin(dialogue)
 
-    def _prompt(
-        title: str, body: dict[int, Widget], callback: Callable[[Widget], None]
-    ) -> None:
-        dialogue = widgets.Dialogue(
-            widgets.Text(title, group="title"),
-            widgets.Tower(*body.values(), group="body"),
-            widgets.Row(
-                widgets.Button(
-                    "Submit",
-                    on_submit=[
-                        lambda self: (
-                            dialogue.remove_from_parent(),
-                            callback(self.parent),
-                        )
-                        and False
-                    ],
-                ),
-                group="input",
+def _alert(app: "HttpApplication", text: str) -> None:
+    """Adds an alert dialogue."""
+
+    dialogue = widgets.Dialogue(
+        widgets.Text(text, group="body"),
+        widgets.Row(
+            widgets.Button(
+                "Close",
+                on_submit=[lambda: dialogue.remove_from_parent()],
             ),
-        )
+            group="input",
+        ),
+    )
 
-        application.pin(dialogue)
+    app.pin(dialogue)
 
-    def _widget_factory(typ: Type[Widget]) -> None:
-        def _create(options) -> None:
-            args = []
-            kwargs = {}
 
-            for key, value in options.items():
-                if isinstance(key, int):
-                    args.append(value)
-                    continue
+def _prompt(
+    app: "HttpApplication",
+    title: str,
+    body: dict[int, Widget],
+    callback: Callable[[Widget], None],
+) -> None:
+    """Adds a prompt dialogue with custom widgets."""
 
-                kwargs[key] = value
+    dialogue = widgets.Dialogue(
+        widgets.Text(title, group="title"),
+        widgets.Tower(*body.values(), group="body"),
+        widgets.Row(
+            widgets.Button(
+                "Submit",
+                on_submit=[
+                    lambda self: (
+                        dialogue.remove_from_parent(),
+                        callback(self.parent),
+                    )
+                    and False
+                ],
+            ),
+            group="input",
+        ),
+    )
 
-            return typ(*args, **kwargs)
+    app.pin(dialogue)
 
-        return _create
+
+def _widget_factory(typ: Type[Widget]) -> None:
+    """Lets Lua instantiate widgets.
+
+    ```
+    Button{"label", on_submit={function() alert("hey") end }}
+    ```
+    """
+
+    def _create(options) -> None:
+        args = []
+        kwargs = {}
+
+        for key, value in options.items():
+            if isinstance(key, int):
+                args.append(value)
+                continue
+
+            kwargs[key] = value
+
+        return typ(*args, **kwargs)
+
+    return _create
+
+
+def init_runtime(runtime: LuaRuntime, app: "HttpApplication") -> None:
+    """Sets up the global namespace for the given runtime."""
 
     lua.execute(
         """
@@ -175,17 +222,19 @@ def init_runtime(runtime: LuaRuntime, application: "HttpApplication") -> None:
     inject = lua.eval("function(obj, name) sandbox[name] = obj end")
 
     inject({"alias": zml_alias, "define": _zml_define}, "zml")
+    inject(app.timeout, "timeout")
     inject(_chocl, "chocl")
-    inject(_alert, "alert")
-    inject(_confirm, "confirm")
-    inject(_prompt, "prompt")
-    inject(application.timeout, "timeout")
+
+    inject(partial(_alert, app), "alert")
+    inject(partial(_confirm, app), "confirm")
+    inject(partial(_prompt, app), "prompt")
+    inject(partial(_multi_find, app), "find")
+
+    inject(LuaStyleWrapper, "styles")
     inject(
         {key.title(): _widget_factory(value) for key, value in WIDGET_TYPES.items()},
         "w",
     )
-    inject(_multi_find, "find")
-    inject(LuaStyleWrapper, "styles")
 
 
 lua = LuaRuntime(
