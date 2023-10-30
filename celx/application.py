@@ -98,7 +98,7 @@ class HttpApplication(Application):
 
             tree = ElementTree(resp.text)
 
-            for sourceable in ["styles", "lua"]:
+            for sourceable in ["style", "script"]:
                 for node in tree.findall(f".//{sourceable}[@src]"):
                     resp = self._session.get(self._prefix_endpoint(node.attrib["src"]))
 
@@ -154,7 +154,7 @@ class HttpApplication(Application):
             # Drill down to find the first widget, pass that on instead.
             if xml.tag == "celx":
                 for node in xml.findall("./page//"):
-                    if node.tag not in ["styles", "lua"]:
+                    if node.tag not in ["style", "script"]:
                         xml = node
                         break
 

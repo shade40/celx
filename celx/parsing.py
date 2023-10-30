@@ -132,7 +132,7 @@ def parse_widget(node: Element) -> Widget:
     query = widget.as_query()
     scope = None
 
-    if (script_node := node.find("lua")) is not None:
+    if (script_node := node.find("script")) is not None:
         # Set up widget & styles globals
         code = LUA_SCRIPT_TEMPLATE.format(
             indented_content=indent(dedent(script_node.text), 4 * " ")
@@ -171,7 +171,7 @@ def parse_widget(node: Element) -> Widget:
     lua.eval("function(widget) sandbox.outer = sandbox.scopes[widget] end")(widget)
 
     for child in node:
-        if child.tag == "styles":
+        if child.tag == "style":
             rules.update(**parse_rules(child.text, query))
             continue
 
@@ -203,7 +203,7 @@ def parse_page(node: Element) -> Page:
             for selector, rule in rules.items():
                 page.rule(selector, **rule)
 
-        elif child.tag == "styles":
+        elif child.tag == "style":
             for selector, rule in parse_rules(child.text).items():
                 page.rule(selector, **rule)
 

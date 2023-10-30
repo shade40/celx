@@ -1,5 +1,5 @@
 {{ define "body" }}
-    <styles> alignment: [center, center] </styles>
+    <style> alignment: [center, center] </style>
     <row eid="data">
         {{ template "counter" . }}
         {{ template "counter" . }}
@@ -8,9 +8,11 @@
         {{ template "counter" . }}
     </row>
     <row>
+        <style>height: 1</style>
         <button on-submit="GET /; select #data; swap #data">Reset</button>
         <button>
-            <lua>
+            Alert
+            <script>
                 on_submit = function()
                     confirm(
                         "Are you sure?",
@@ -20,12 +22,11 @@
                         end
                     )
                 end
-            </lua>
-            alert
+            </script>
         </button>
         <button>
             Add Prompt
-            <lua>
+            <script>
                 on_submit = function()
                     prompt(
                         "What is your opinion?",
@@ -37,7 +38,7 @@
                         chocl("POST /prompt; SWAP #data")
                     )
                 end
-            </lua>
+            </script>
         </button>
     </row>
 {{ end }}

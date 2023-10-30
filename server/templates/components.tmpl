@@ -1,7 +1,7 @@
 {{ define "counter" }}
 <button>
     Current value: $count
-    <lua>
+    <script>
         count = 0
 
         function on_submit()
@@ -13,6 +13,6 @@
                 self.palette = "error"
             end
         end
-    </lua>
+    </script>
 </button>
 {{ end }}
