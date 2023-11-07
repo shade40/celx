@@ -166,121 +166,99 @@ class HttpApplication(Application):
 
         self._current_instructions.append(instructions)
 
-        for instr in instructions:
-            if instr.verb.value in HTTPMethod.__members__:
-                endpoint, container = instr.args
+        try:
+            for instr in instructions:
+                if instr.verb.value in HTTPMethod.__members__:
+                    endpoint, container = instr.args
 
-                body = caller.parent
+                    body = caller.parent
 
-                if container is not None:
-                    try:
+                    if container is not None:
                         body = self.find(container)
-                    except Exception as exc:
-                        self._error(exc)
-                        return
 
-                    if body is None:
-                        self._error(
-                            ValueError(f"nothing matched selector {container!r}")
-                        )
-                        return
+                        if body is None:
+                            raise ValueError(f"nothing matched selector {container!r}")
 
-                content = body.serialize()
+                    content = body.serialize()
 
-                self._http(
-                    HTTPMethod(instr.verb.value), endpoint, content, _set_result
-                ).join()
+                    self._http(
+                        HTTPMethod(instr.verb.value), endpoint, content, _set_result
+                    ).join()
 
-                continue
+                    continue
 
-            if instr.verb.value in TreeMethod.__members__:
-                if result is None:
-                    self._error(ValueError("no result to update tree with"))
-                    return
+                if instr.verb.value in TreeMethod.__members__:
+                    if result is None:
+                        raise ValueError("no result to update tree with")
 
-                selector, modifier = instr.args
-
-                try:
+                    selector, modifier = instr.args
                     target = self.find(selector)
-                except Exception as exc:
-                    self._error(exc)
 
-                if target is None:
-                    self._error(ValueError(f"nothing matched selector {selector!r}"))
-                    return
+                    if target is None:
+                        raise ValueError(f"nothing matched selector {selector!r}")
 
-                if instr.verb is Verb.SWAP:
-                    offsets = {"before": -1, None: 0, "after": 1}
+                    if instr.verb is Verb.SWAP:
+                        offsets = {"before": -1, None: 0, "after": 1}
 
-                    if modifier == "in":
-                        target.update_children([result])
+                        if modifier == "in":
+                            target.update_children([result])
 
-                    elif modifier in offsets:
-                        target.parent.replace(target, result, offset=offsets[modifier])
+                        elif modifier in offsets:
+                            target.parent.replace(
+                                target, result, offset=offsets[modifier]
+                            )
 
-                    else:
-                        self._error(
-                            ValueError(
+                        else:
+                            raise ValueError(
                                 f"unknown modifier {modifier!r} for verb {instr.verb!r}"
                             )
-                        )
-                        return
 
-                elif instr.verb is Verb.INSERT:
-                    if modifier == "in":
-                        target.insert(0, result)
-                    else:
-                        index = target.parent.children.index(target)
-                        offsets = {"before": index, "after": index + 1}
+                    elif instr.verb is Verb.INSERT:
+                        if modifier == "in":
+                            target.insert(0, result)
+                        else:
+                            index = target.parent.children.index(target)
+                            offsets = {"before": index, "after": index + 1}
 
-                        if modifier not in offsets:
-                            self._error(
-                                ValueError(
+                            if modifier not in offsets:
+                                raise ValueError(
                                     f"unknown modifier {modifier!r}"
                                     + f" for verb {instr.verb!r}"
                                 )
-                            )
-                            return
 
-                        target.parent.insert(offsets[modifier], result)
+                            target.parent.insert(offsets[modifier], result)
 
-                elif instr.verb is Verb.APPEND:
-                    if modifier != "in":
-                        self._error(
-                            ValueError(
+                    elif instr.verb is Verb.APPEND:
+                        if modifier != "in":
+                            raise ValueError(
                                 f"unknown modifier {modifier!r} for verb {instr.verb!r}"
                             )
+
+                        target.append(result)
+
+                    # TODO: This is hacky as hell, but we need it for widgets to load in
+                    #       .styles
+                    parent = result.parent
+                    self._init_widget(result)
+                    result.parent = parent
+
+                    continue
+
+                if instr.verb is Verb.SELECT:
+                    if result is None:
+                        raise ValueError("no result to select from")
+
+                    if not isinstance(result, Container):
+                        raise ValueError(
+                            f"cannot select from non container ({result!r})"
                         )
-                        return
 
-                    target.append(result)
-
-                # TODO: This is hacky as hell, but we need it for widgets to load in
-                #       .styles
-                parent = result.parent
-                self._init_widget(result)
-                result.parent = parent
-
-                continue
-
-            if instr.verb is Verb.SELECT:
-                if result is None:
-                    self._error(ValueError("no result to select from"))
-                    return
-
-                if not isinstance(result, Container):
-                    self._error(
-                        ValueError(f"cannot select from non container ({result!r})")
-                    )
-                    return
-
-                try:
                     result = self.find(instr.args[0], scope=result)
-                except Exception as exc:
-                    self._error(exc)
-                    return
+                    continue
 
-                continue
+        except Exception as exc:
+            self._error(exc)
+            return
 
         self._current_instructions.remove(instructions)
 
