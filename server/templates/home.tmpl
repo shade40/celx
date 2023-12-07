@@ -4,16 +4,13 @@
         {{ template "counter" . }}
         {{ template "counter" . }}
         {{ template "counter" . }}
-        {{ template "counter" . }}
-        {{ template "counter" . }}
     </row>
     <row>
         <style>height: 1</style>
-        <button on-submit="GET /; select #data; swap #data">Reset</button>
+        <button on-submit="GET /; select #data; swap in #body">Reset</button>
         <button>
-            Alert
             <script>
-                on_submit = function()
+                function on_submit()
                     confirm(
                         "Are you sure?",
                         "Deleting files is bad",
@@ -23,11 +20,12 @@
                     )
                 end
             </script>
+            Alert
         </button>
         <button>
             Add Prompt
             <script>
-                on_submit = function()
+                function on_submit()
                     prompt(
                         "What is your opinion?",
                         {
