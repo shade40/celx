@@ -162,7 +162,12 @@ class HttpApplication(Application):
                     self._error(ValueError("no widget in response"))
                     return
 
-            result = parse_widget(xml)[0]
+            result, rules = parse_widget(xml)
+
+            # TODO: There might be cases where we don't want to apply styles immediately,
+            #       like when a future "DELETE" instruction is added.
+            for selector, rule in rules.items():
+                page.rule(selector, **rule)
 
         self._current_instructions.append(instructions)
 
