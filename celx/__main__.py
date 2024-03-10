@@ -4,11 +4,15 @@ from . import HttpApplication
 
 
 def run(endpoint: str):
-    with HttpApplication(endpoint, title="celx") as app:
+    """Runs the application at the given endpoint."""
+
+    with HttpApplication(endpoint, title="celx"):
         ...
 
 
 def main() -> None:
+    """The main entrypoint."""
+
     parser = ArgumentParser("A prototype browser for celx applications.")
 
     subs = parser.add_subparsers(required=True)

@@ -1,8 +1,6 @@
 import re
 from xml.etree.ElementTree import Element
 
-from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Callable
 from textwrap import indent, dedent
 
@@ -37,6 +35,28 @@ end\
 
 
 def lua_formatted_get_content(scope: dict[str, Any]) -> Callable[[Widget], list[str]]:
+    """Returns a `get_content` method that formats Lua variables.
+
+    You can use any variable available in the current scope using a $ prefix, like
+    `$count`.
+    """
+
+    def _resolve(word: str, scope: dict[str, Any]) -> str:
+        if "." not in word:
+            return str(scope[word])
+
+        *scopeids, word = word.split(".")
+
+        inner = scope
+
+        for scopeid in scopeids:
+            if scopeid not in inner:
+                raise ValueError(f"unregistered scopeid {scopeid!r}")
+
+            inner = inner[scopeid]
+
+        return str(inner[word])
+
     def _get_content(self: Widget) -> list[str]:
         lines = []
 
@@ -52,21 +72,7 @@ def lua_formatted_get_content(scope: dict[str, Any]) -> Callable[[Widget], list[
                 if in_var:
                     in_var = False
 
-                    if "." in word:
-                        *scopeids, word = word.split(".")
-
-                        inner = scope
-
-                        for scopeid in scopeids:
-                            if scopeid not in inner:
-                                raise ValueError(f"unregistered scopeid {scopeid!r}")
-
-                            inner = inner[scopeid]
-
-                        parts.append(str(inner[word]))
-                        continue
-
-                    word = str(scope[word])
+                    word = _resolve(word, scope)
 
                 parts.append(word)
 
@@ -114,8 +120,12 @@ def _looser_callback_wrapper(
     return _wrapper
 
 
-# Technically rules is more like a `dict[str, dict[str, <something>]]`!
-def parse_widget(node: Element) -> tuple[Widget, dict[str, Any]]:
+# TODO: Technically rules is more like a `dict[str, dict[str, <something>]]`!
+def parse_widget(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+    node: Element,
+) -> tuple[Widget, dict[str, Any]]:
+    """Parses a widget, its callbacks & its styling from an XML node."""
+
     init: dict[str, str | tuple[str, ...] | list[Callable[[Widget], bool]]] = {}
 
     for key, value in node.attrib.items():
@@ -168,7 +178,7 @@ def parse_widget(node: Element) -> tuple[Widget, dict[str, Any]]:
             setup_scope = lua.eval(code)
 
         except Exception as err:
-            raise ValueError(code)
+            raise ValueError(code) from err
 
         scope = setup_scope(widget)
 
@@ -222,6 +232,8 @@ def parse_widget(node: Element) -> tuple[Widget, dict[str, Any]]:
 
 
 def parse_page(node: Element) -> Page:
+    """Parses a page, its scripts & its children from XML node."""
+
     page_node = node.find("page")
 
     if page_node is None:

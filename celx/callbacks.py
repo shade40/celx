@@ -8,6 +8,8 @@ from celadon import Widget
 
 
 class HTTPMethod(Enum):
+    """An enumeration of supported HTTP methods."""
+
     GET = "GET"
     POST = "POST"
     DELETE = "DELETE"
@@ -16,12 +18,16 @@ class HTTPMethod(Enum):
 
 
 class TreeMethod(Enum):
+    """An enumeration of supported tree-manipulation methods."""
+
     INSERT = "INSERT"
     SWAP = "SWAP"
     APPEND = "APPEND"
 
 
 class Verb(Enum):
+    """An enumeration of supported verbs in Chocl."""
+
     GET = HTTPMethod.GET.value
     POST = HTTPMethod.POST.value
     DELETE = HTTPMethod.DELETE.value
@@ -37,6 +43,8 @@ class Verb(Enum):
 
 @dataclass
 class Instruction:
+    """A single Chocl instruction."""
+
     verb: Verb
     args: list[str | None]
 

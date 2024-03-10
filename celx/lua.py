@@ -3,9 +3,8 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Type
 
-from lupa import LuaRuntime  # type: ignore
+from lupa import LuaRuntime  # type: ignore # pylint: disable=no-name-in-module
 from celadon import Widget, widgets
-from celadon.style_map import StyleMap
 from zenith import zml_alias, zml_macro, MacroType
 
 from .callbacks import parse_callback
@@ -20,7 +19,7 @@ WIDGET_TYPES = {
 }
 
 
-def _attr_filter(obj, attr, is_setting):
+def _attr_filter(_, attr, __):
     """Removes access to sunder and dunder attributes in Lua code."""
 
     if attr.startswith("_"):
@@ -202,7 +201,7 @@ def _widget_factory(typ: Type[Widget]) -> Callable[[Any], Widget]:
 def init_runtime(runtime: LuaRuntime, app: "HttpApplication") -> None:
     """Sets up the global namespace for the given runtime."""
 
-    lua.execute(
+    runtime.execute(
         """
         sandbox = {
           ipairs = ipairs,

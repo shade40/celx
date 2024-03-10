@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from xml.etree.ElementTree import fromstring as ElementTree, Element
 
 from celadon import Application, Page, Widget, Container
-from requests import Session, Response
+from requests import Session
 
 from .parsing import parse_widget, parse_page
 from .callbacks import (
@@ -22,6 +22,8 @@ __all__ = ["HttpApplication"]
 
 
 def threaded(func: Callable[..., None]) -> Callable[..., None]:
+    """Returns a callable that runs the given function in a thread."""
+
     @wraps(func)
     def _inner(*args, **kwargs) -> None:
         Thread(target=func, args=args, kwargs=kwargs).start()
@@ -30,6 +32,8 @@ def threaded(func: Callable[..., None]) -> Callable[..., None]:
 
 
 class HttpApplication(Application):
+    """An application class for HTTP pages."""
+
     def __init__(self, domain: str, **app_args: Any) -> None:
         super().__init__(**app_args)
 
@@ -52,6 +56,8 @@ class HttpApplication(Application):
 
     @property
     def session(self) -> Session:
+        """Returns the current requests session."""
+
         return self._session
 
     def _error(self, error: Exception) -> None:
@@ -123,7 +129,8 @@ class HttpApplication(Application):
 
         try:
             page = parse_page(node)
-        except Exception as exc:
+
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             self._error(exc)
             return
 
@@ -145,7 +152,9 @@ class HttpApplication(Application):
         self.apply_rules()
 
     @threaded
-    def run_instructions(self, instructions: list[Instruction], caller: Widget) -> None:
+    def run_instructions(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+        self, instructions: list[Instruction], caller: Widget
+    ) -> None:
         """Runs through a list of instructions."""
 
         result = None
@@ -176,7 +185,7 @@ class HttpApplication(Application):
 
         self._current_instructions.append(instructions)
 
-        try:
+        try:  # pylint: disable=too-many-nested-blocks
             for instr in instructions:
                 if instr.verb.value in HTTPMethod.__members__:
                     endpoint, container = instr.args
@@ -292,7 +301,7 @@ class HttpApplication(Application):
                     result = self.find(instr.args[0], scope=result)
                     continue
 
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             self._error(exc)
             return
 
