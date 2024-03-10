@@ -41,16 +41,18 @@ class Instruction:
     args: tuple[str, ...]
 
 
-def _instruction_runner(instructions: list[Instruction]) -> Callable[[Widget], None]:
+def _instruction_runner(instructions: list[Instruction]) -> Callable[[Widget], bool]:
     """Creates a function to runs the given instructions on the calller widget's app."""
 
-    def _interpret(self: Widget) -> None:
+    def _interpret(self: Widget) -> bool:
         self.app.run_instructions(instructions, self)
+
+        return True
 
     return _interpret
 
 
-def parse_callback(text: str) -> Callable[[str], bool]:
+def parse_callback(text: str) -> Callable[[Widget], bool]:
     """Parses a callback descriptor into a list of Instructions."""
 
     lines = re.split("[;\n]", text)
