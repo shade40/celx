@@ -37,7 +37,7 @@ end\
 
 
 def lua_formatted_get_content(scope: dict[str, Any]) -> Callable[[Widget], list[str]]:
-    def _get_content(self) -> None:
+    def _get_content(self: Widget) -> list[str]:
         lines = []
 
         for line in self.__class__.get_content(self):
@@ -88,6 +88,30 @@ def parse_rules(text: str, query: str | None = None) -> dict[str, Any]:
         )
 
     return load_rules(style)
+
+
+def _looser_callback_wrapper(
+    callback: Callable[[Widget | None], bool | None]
+) -> Callable[[Widget], bool]:
+    """Let's Lua create callbacks without arguments or return values.
+
+    This is done becaues the Lua scope can usually already access the caller widget
+    using the `self` variable.
+    """
+
+    def _wrapper(data: Widget) -> bool:
+        try:
+            res = callback(data)
+        except TypeError:
+            res = callback(data)
+
+        if res is not None:
+            return res
+
+        # Assume handled if not otherwise stated
+        return True
+
+    return _wrapper
 
 
 def parse_widget(node: Element) -> Widget:
@@ -157,7 +181,7 @@ def parse_widget(node: Element) -> Widget:
                 if event is None:
                     raise ValueError(f"invalid event handler {key!r}")
 
-                event += value
+                event += _looser_callback_wrapper(value)
 
         node.remove(script_node)
 

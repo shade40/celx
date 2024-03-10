@@ -40,9 +40,11 @@ class HttpApplication(Application):
         self._session = Session()
         self._current_instructions = []
 
-        def _clear_instructions():
+        def _clear_instructions(_: Application):
             for instructions in self._current_instructions:
                 instructions.clear()
+
+            return True
 
         self.on_page_changed += _clear_instructions
 
@@ -132,7 +134,7 @@ class HttpApplication(Application):
 
         self._page = page
         self._mouse_target = self._page[0]
-        self.on_page_changed()
+        self.on_page_changed(page)
 
         if page.route_name == "/":
             self._terminal.set_title(self.title)
@@ -167,7 +169,7 @@ class HttpApplication(Application):
             # TODO: There might be cases where we don't want to apply styles immediately,
             #       like when a future "DELETE" instruction is added.
             for selector, rule in rules.items():
-                page.rule(selector, **rule)
+                self.page.rule(selector, **rule)
 
         self._current_instructions.append(instructions)
 

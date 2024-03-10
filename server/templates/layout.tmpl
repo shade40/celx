@@ -13,9 +13,9 @@
 
 <celx version="0">
     <page title={{ if eq .Page "home" }} "" {{ else }} "{{ .Page }}" {{ end }}>
-        <style src="/static/styles.yaml" />
+        <style src="/static/styles.yaml"></style>
         <tower eid="root">
-            <script src="/static/script.lua" />
+            <script src="/static/script.lua"></script>
             {{ template "header" . }}
             <tower eid="body">
                 {{ template "body" . }}

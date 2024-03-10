@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from lupa import LuaRuntime
 from celadon import Widget, widgets
@@ -76,7 +76,7 @@ def _zml_define(name: str, macro: MacroType) -> None:
     zml_macro(_inner)
 
 
-def _chocl(descriptor: str) -> Callable[[Widget], None]:
+def _chocl(descriptor: str) -> Callable[[Widget], bool]:
     """Provides Lua access to the celx hypermedia-oriented callback language."""
 
     return parse_callback(descriptor)
@@ -114,12 +114,19 @@ def _confirm(
 def _alert(app: "HttpApplication", text: str) -> None:
     """Adds an alert dialogue."""
 
+    dialogue: widgets.Dialogue
+
+    def _remove(_: Widget) -> bool:
+        dialogue.remove_from_parent()
+
+        return True
+
     dialogue = widgets.Dialogue(
         widgets.Text(text, group="body"),
         widgets.Row(
             widgets.Button(
                 "Close",
-                on_submit=[lambda: dialogue.remove_from_parent()],
+                on_submit=[_remove],
             ),
             group="input",
         ),
@@ -173,6 +180,9 @@ def _widget_factory(typ: Type[Widget]) -> None:
             if isinstance(key, int):
                 args.append(value)
                 continue
+
+            if key == "groups":
+                value = tuple(value.values())
 
             kwargs[key] = value
 
