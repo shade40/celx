@@ -114,8 +114,9 @@ def _looser_callback_wrapper(
     return _wrapper
 
 
-def parse_widget(node: Element) -> Widget:
-    init = {}
+# Technically rules is more like a `dict[str, dict[str, <something>]]`!
+def parse_widget(node: Element) -> tuple[Widget, dict[str, Any]]:
+    init: dict[str, str | tuple[str, ...] | list[Callable[[Widget], bool]]] = {}
 
     for key, value in node.attrib.items():
         if key == "groups":
@@ -149,9 +150,10 @@ def parse_widget(node: Element) -> Widget:
     cls = WIDGET_TYPES[node.tag]
 
     if text is not None and text.strip() != "":
-        widget = cls(text.strip(), **init)
+        # The init args aren't strongly typed.
+        widget = cls(text.strip(), **init)  # type: ignore
     else:
-        widget = cls(**init)
+        widget = cls(**init)  # type: ignore
 
     query = widget.as_query()
     scope = None
@@ -159,7 +161,7 @@ def parse_widget(node: Element) -> Widget:
     if (script_node := node.find("script")) is not None:
         # Set up widget & styles globals
         code = LUA_SCRIPT_TEMPLATE.format(
-            indented_content=indent(dedent(script_node.text), 4 * " ")
+            indented_content=indent(dedent(script_node.text or ""), 4 * " ")
         )
 
         try:
@@ -181,11 +183,13 @@ def parse_widget(node: Element) -> Widget:
                 if event is None:
                     raise ValueError(f"invalid event handler {key!r}")
 
+                assert callable(value)
+
                 event += _looser_callback_wrapper(value)
 
         node.remove(script_node)
 
-    rules = {}
+    rules: dict[str, Any] = {}
 
     # Save current outer scope
     old_outer = lua.eval("sandbox.outer")
@@ -196,17 +200,20 @@ def parse_widget(node: Element) -> Widget:
 
     for child in node:
         if child.tag == "style":
-            rules.update(**parse_rules(child.text, query))
+            rules.update(**parse_rules(child.text or "", query))
             continue
 
         parsed, parsed_rules = parse_widget(child)
 
-        widget += parsed
+        # This will error at runtime
+        widget += parsed  # type: ignore
+
         rules.update(**parsed_rules)
 
     # Set formatted get content for the widget
     get_content = lua_formatted_get_content(scope)
-    widget.get_content = get_content.__get__(widget, widget.__class__)
+    # We're overwriting the `get_content` method intentionally.
+    widget.get_content = get_content.__get__(widget, widget.__class__)  # type: ignore
 
     # Reset outer scope to what it used to be
     lua.eval("function(scope) sandbox.outer = scope end")(old_outer)
@@ -217,7 +224,11 @@ def parse_widget(node: Element) -> Widget:
 def parse_page(node: Element) -> Page:
     page_node = node.find("page")
 
-    page = Page(**page_node.attrib)
+    if page_node is None:
+        raise ValueError("no <page /> node found.")
+
+    # Init args aren't strongly typed
+    page = Page(**page_node.attrib)  # type: ignore
 
     for child in page_node:
         if child.tag in WIDGET_TYPES:
@@ -228,7 +239,7 @@ def parse_page(node: Element) -> Page:
                 page.rule(selector, **rule)
 
         elif child.tag == "style":
-            for selector, rule in parse_rules(child.text).items():
+            for selector, rule in parse_rules(child.text or "").items():
                 page.rule(selector, **rule)
 
         else:

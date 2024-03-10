@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Type
 
-from lupa import LuaRuntime
+from lupa import LuaRuntime  # type: ignore
 from celadon import Widget, widgets
 from celadon.style_map import StyleMap
-from zenith import zml_alias, zml_macro
+from zenith import zml_alias, zml_macro, MacroType
 
 from .callbacks import parse_callback
 
@@ -57,7 +57,7 @@ class LuaStyleWrapper:
 
 def _multi_find(
     app: "HttpApplication", selector: str, multiple: bool = False
-) -> Widget | list[Widget]:
+) -> Widget | list[Widget] | None:
     """Finds widgets from the application."""
 
     if multiple:
@@ -82,10 +82,21 @@ def _chocl(descriptor: str) -> Callable[[Widget], bool]:
     return parse_callback(descriptor)
 
 
+def _remove_and_callback_with(
+    dialogue: widgets.Dialogue, callback: Callable, value: Any
+) -> bool:
+    dialogue.remove_from_parent()
+    callback(value)
+
+    return False
+
+
 def _confirm(
     app: "HttpApplication", title: str, body: str, callback: Callable[[bool], None]
 ) -> None:
     """Adds a confirmation dialogue."""
+
+    dialogue: widgets.Dialogue
 
     dialogue = widgets.Dialogue(
         widgets.Text(title, group="title"),
@@ -94,15 +105,13 @@ def _confirm(
             widgets.Button(
                 "Confirm",
                 on_submit=[
-                    lambda self: (dialogue.remove_from_parent(), callback(True))
-                    and False
+                    lambda _: _remove_and_callback_with(dialogue, callback, True)
                 ],
             ),
             widgets.Button(
                 "Deny",
                 on_submit=[
-                    lambda self: (dialogue.remove_from_parent(), callback(False))
-                    and False
+                    lambda _: _remove_and_callback_with(dialogue, callback, False)
                 ],
             ),
             group="input",
@@ -139,7 +148,7 @@ def _prompt(
     app: "HttpApplication",
     title: str,
     body: dict[int, Widget],
-    callback: Callable[[Widget], None],
+    callback: Callable[[Widget], bool],
 ) -> None:
     """Adds a prompt dialogue with custom widgets."""
 
@@ -150,11 +159,9 @@ def _prompt(
             widgets.Button(
                 "Submit",
                 on_submit=[
-                    lambda self: (
-                        dialogue.remove_from_parent(),
-                        callback(self.parent),
+                    lambda self: _remove_and_callback_with(
+                        dialogue, callback, self.parent
                     )
-                    and False
                 ],
             ),
             group="input",
@@ -164,7 +171,8 @@ def _prompt(
     app.pin(dialogue)
 
 
-def _widget_factory(typ: Type[Widget]) -> None:
+# TODO: This takes a lua table, not "Any"!
+def _widget_factory(typ: Type[Widget]) -> Callable[[Any], Widget]:
     """Lets Lua instantiate widgets.
 
     ```
@@ -172,7 +180,7 @@ def _widget_factory(typ: Type[Widget]) -> None:
     ```
     """
 
-    def _create(options) -> None:
+    def _create(options) -> Widget:
         args = []
         kwargs = {}
 

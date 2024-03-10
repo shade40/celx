@@ -38,9 +38,9 @@ class HttpApplication(Application):
         self._page = Page()
         self._url = urlparse(domain)
         self._session = Session()
-        self._current_instructions = []
+        self._current_instructions: list[list[Instruction]] = []
 
-        def _clear_instructions(_: Application):
+        def _clear_instructions(_: Page) -> bool:
             for instructions in self._current_instructions:
                 instructions.clear()
 
@@ -72,8 +72,8 @@ class HttpApplication(Application):
         method: HTTPMethod,
         endpoint: str,
         data: dict[str, Any],
-        handler: Callable[[str], None],
-    ) -> None:
+        handler: Callable[[Element], None],
+    ) -> Thread:
         endpoint = self._prefix_endpoint(endpoint)
 
         if method is HTTPMethod.GET:
@@ -150,7 +150,7 @@ class HttpApplication(Application):
 
         result = None
 
-        def _set_result(xml: ElementTree) -> None:
+        def _set_result(xml: Element) -> None:
             nonlocal result
 
             # Drill down to find the first widget, pass that on instead.
@@ -166,6 +166,9 @@ class HttpApplication(Application):
 
             result, rules = parse_widget(xml)
 
+            if self.page is None:
+                return
+
             # TODO: There might be cases where we don't want to apply styles immediately,
             #       like when a future "DELETE" instruction is added.
             for selector, rule in rules.items():
@@ -177,14 +180,18 @@ class HttpApplication(Application):
             for instr in instructions:
                 if instr.verb.value in HTTPMethod.__members__:
                     endpoint, container = instr.args
+                    assert endpoint is not None
 
-                    body = caller.parent
+                    body: Widget | Page | None = caller.parent
 
                     if container is not None:
                         body = self.find(container)
 
                         if body is None:
                             raise ValueError(f"nothing matched selector {container!r}")
+
+                    if not isinstance(body, Widget):
+                        raise ValueError(f"request body {body!r} is not serializable")
 
                     content = body.serialize()
 
@@ -199,10 +206,17 @@ class HttpApplication(Application):
                         raise ValueError("no result to update tree with")
 
                     selector, modifier = instr.args
+                    assert selector is not None
+
                     target = self.find(selector)
 
                     if target is None:
                         raise ValueError(f"nothing matched selector {selector!r}")
+
+                    if not isinstance(target, Container):
+                        raise ValueError(
+                            f"cannot modify tree of non-container {target!r}"
+                        )
 
                     if instr.verb is Verb.SWAP:
                         offsets = {"before": -1, None: 0, "after": 1}
@@ -211,6 +225,12 @@ class HttpApplication(Application):
                             target.update_children([result])
 
                         elif modifier in offsets:
+                            if not isinstance(target.parent, Container):
+                                raise ValueError(
+                                    "cannot modify tree of non-container parent of"
+                                    + repr(target)
+                                )
+
                             target.parent.replace(
                                 target, result, offset=offsets[modifier]
                             )
@@ -223,7 +243,14 @@ class HttpApplication(Application):
                     elif instr.verb is Verb.INSERT:
                         if modifier == "in":
                             target.insert(0, result)
+
                         else:
+                            if not isinstance(target.parent, Container):
+                                raise ValueError(
+                                    "cannot modify tree of non-container parent of"
+                                    + repr(target)
+                                )
+
                             index = target.parent.children.index(target)
                             offsets = {"before": index, "after": index + 1}
 
@@ -259,6 +286,8 @@ class HttpApplication(Application):
                         raise ValueError(
                             f"cannot select from non container ({result!r})"
                         )
+
+                    assert instr.args[0] is not None
 
                     result = self.find(instr.args[0], scope=result)
                     continue

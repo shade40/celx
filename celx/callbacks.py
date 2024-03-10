@@ -38,14 +38,15 @@ class Verb(Enum):
 @dataclass
 class Instruction:
     verb: Verb
-    args: tuple[str, ...]
+    args: list[str | None]
 
 
 def _instruction_runner(instructions: list[Instruction]) -> Callable[[Widget], bool]:
     """Creates a function to runs the given instructions on the calller widget's app."""
 
     def _interpret(self: Widget) -> bool:
-        self.app.run_instructions(instructions, self)
+        # self.app must be `HttpApplication` by this point.
+        self.app.run_instructions(instructions, self)  # type: ignore
 
         return True
 
@@ -67,7 +68,7 @@ def parse_callback(text: str) -> Callable[[Widget], bool]:
             if len(args) > 1:
                 raise ValueError(f"too many arguments for verb {verb!r}")
 
-            instructions.append(Instruction(verb, (args[0],)))
+            instructions.append(Instruction(verb, [args[0]]))
 
         else:
             if len(args) > 2:
@@ -79,6 +80,6 @@ def parse_callback(text: str) -> Callable[[Widget], bool]:
             if len(args) == 2:
                 modifier, arg = args
 
-            instructions.append(Instruction(verb, (arg, modifier)))
+            instructions.append(Instruction(verb, [arg, modifier]))
 
     return _instruction_runner(instructions)

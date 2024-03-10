@@ -27,6 +27,15 @@ Row#header:
   gap: 3
   fallback_gap: 3
 
+Row:
+  fill_style: "@red"
+
+Field:
+  fill_style: "@red"
+
+  .two:
+    content_style: "blue"
+
 Link:
   content_style: .primary
 

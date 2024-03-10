@@ -29,7 +29,11 @@
                     prompt(
                         "What is your opinion?",
                         {
-                            w.Field{name="name", placeholder="Name..."},
+                            w.Field{
+                                name="name",
+                                placeholder="Name...",
+                                groups={"one", "two"},
+                            },
                             w.Checkbox{name="true", "Are you true?"},
                             w.Checkbox{name="false", "Are you false?"},
                         },
