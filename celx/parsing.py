@@ -138,6 +138,12 @@ def parse_widget(  # pylint: disable=too-many-locals,too-many-branches,too-many-
             init[key] = [parse_callback(value)]
             continue
 
+        if value.isdigit():
+            value = int(value)
+
+        elif value.lstrip("-+").replace(".", "", 1).isdigit():
+            value = float(value)
+
         init[key] = value
 
     text = node.text
