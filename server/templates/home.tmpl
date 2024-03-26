@@ -5,6 +5,65 @@
         {{ template "counter" . }}
         {{ template "counter" . }}
     </row>
+    <checkbox>Disabled
+        <script>
+            function on_change(value)
+                for _, w in ipairs(find("Button|Field|Slider", true)) do
+                    if w ~= self then
+                        w.disabled = value
+                    end
+                end
+            end
+        </script>
+    </checkbox>
+    <dropdown title="Select...">
+        <button name="opt-1">Option 1</button>
+        <button disabled="true">--Option 0--</button>
+        <button>Option 2</button>
+        <button>Option 3</button>
+    </dropdown>
+    <field>Hello</field>
+    <tower groups="fill center">
+        <style>
+            gap: 0
+            frame: [frameless, padded, frameless, padded]
+        </style>
+        <tower>
+            <style>
+                width: 0.5
+                gap: 1
+            </style>
+            <row>
+                <style>
+                    fallback_gap: 1
+                    height: 1
+                </style>
+                <slider value="0.4">
+                    <script>
+                        function on_change(value)
+                            for _, w in ipairs(find("Progress", true)) do
+                                w.value = value
+                            end
+                        end
+                    </script>
+                </slider>
+                <text>
+                    <script>
+                        val = 0.0
+
+                        function pre_content(self)
+                            val = find("Slider").value
+                        end
+                    </script>
+                    $val
+                </text>
+            </row>
+            <progress value="0.5" groups="minimal" />
+            <progress value="0.5" />
+            <progress value="0.5" groups="tall minimal" />
+            <progress value="0.5" groups="tall" />
+        </tower>
+    </tower>
     <row>
         <style> height: 1 </style>
         <button on-submit="GET /; select #data; swap in #body">Reset</button>
@@ -36,6 +95,15 @@
                             },
                             w.Checkbox{name="true", "Are you true?"},
                             w.Checkbox{name="false", "Are you false?"},
+                            w.Slider{name="slider", scale=100},
+                            w.Dropdown{
+                                name="select", title="Select...",
+                                items={
+                                    w.Button{"Option 1", name="opt-1"},
+                                    w.Button{"Option 2", name="opt-2"},
+                                    w.Button{"Option 3"},
+                                },
+                            },
                         },
                         chocl("POST /prompt; SWAP #data")
                     )
