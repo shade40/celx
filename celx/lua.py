@@ -22,6 +22,9 @@ WIDGET_TYPES = {
 def _attr_filter(_, attr, __):
     """Removes access to sunder and dunder attributes in Lua code."""
 
+    if not isinstance(attr, str):
+        return attr
+
     if attr.startswith("_"):
         raise AttributeError("access denied")
 
