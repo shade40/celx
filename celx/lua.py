@@ -194,6 +194,13 @@ def _widget_factory(typ: Type[Widget]) -> Callable[[Any], Widget]:
             if key == "groups":
                 value = tuple(value.values())
 
+            # Likely a Lua table
+            elif hasattr(value, "values"):
+                if all(isinstance(val, int) for val in list(value)):
+                    value = [*value.values()]
+                else:
+                    value = dict(value.items())
+
             kwargs[key] = value
 
         return typ(*args, **kwargs)
