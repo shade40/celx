@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable, Type
 
 from lupa import LuaRuntime  # type: ignore # pylint: disable=no-name-in-module
 from celadon import Widget, widgets
-from zenith import zml_alias, zml_macro, MacroType
+from zenith import zml_alias, zml_macro, MacroType, zml_escape
 
 from .callbacks import parse_callback
 
@@ -248,13 +248,16 @@ def init_runtime(runtime: LuaRuntime, app: "HttpApplication") -> None:
 
     inject = lua.eval("function(obj, name) sandbox[name] = obj end")
 
-    inject({"alias": zml_alias, "define": _zml_define}, "zml")
+    inject({"alias": zml_alias, "define": _zml_define, "escape": zml_escape}, "zml")
     inject(app.timeout, "timeout")
     inject(_chocl, "chocl")
 
     inject(partial(_alert, app), "alert")
     inject(partial(_confirm, app), "confirm")
     inject(partial(_prompt, app), "prompt")
+    # inject(app.find, "find")
+    # inject(app.find_all, "find_all")
+
     inject(partial(_multi_find, app), "find")
 
     inject(LuaStyleWrapper, "styles")

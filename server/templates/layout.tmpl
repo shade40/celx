@@ -1,5 +1,6 @@
 {{ define "header" }}
 <row eid="header">
+    <style>height: 1</style>
     <text>[~/]Welcome!</text>
     <text group="pad">[0]</text>
     {{ range .Pages }}
@@ -10,7 +11,6 @@
     {{ end }}
 </row>
 {{ end }}
-
 <celx version="0">
     <page title={{ if eq .Page "home" }} "" {{ else }} "{{ .Page }}" {{ end }}>
         <style src="/static/styles.yaml"></style>

@@ -1,12 +1,13 @@
 from argparse import ArgumentParser
 
 from . import HttpApplication
+from slate import feed
 
 
 def run(endpoint: str):
     """Runs the application at the given endpoint."""
 
-    with HttpApplication(endpoint, title="celx"):
+    with HttpApplication(endpoint, title="celx") as app:
         ...
 
 

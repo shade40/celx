@@ -55,6 +55,23 @@ func (server Server) Blog(w http.ResponseWriter, r *http.Request) {
 	templates.Execute(w, context)
 }
 
+func (server Server) Shrink(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/xml")
+
+	templates, err := template.ParseFiles(
+		"templates/layout.tmpl",
+		"templates/shrink.tmpl",
+	)
+
+	if err != nil {
+		log.Panic(err)
+		return
+	}
+
+	context := Context{"shrink", server.Pages}
+	templates.Execute(w, context)
+}
+
 func (server Server) Buttons(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/xml")
 
@@ -89,9 +106,27 @@ func (server Server) PostPrompt(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "<text eid='data' groups='w-fill h-fill'>%v\n</text>", string(indent))
 }
 
+func (server Server) Container(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/xml")
+
+	templates, err := template.ParseFiles(
+		"templates/layout.tmpl",
+		"templates/container.tmpl",
+		"templates/components.tmpl",
+	)
+
+	if err != nil {
+		log.Panic(err)
+		return
+	}
+
+	context := Context{"container", server.Pages}
+	templates.Execute(w, context)
+}
+
 func main() {
 	server := Server{
-		[]string{"", "blog"},
+		[]string{"", "blog", "shrink", "container"},
 	}
 
 	r := chi.NewRouter()
@@ -101,8 +136,10 @@ func main() {
 	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 
 	r.Get("/", server.Home)
+	r.Get("/container", server.Container)
 	r.Get("/blog", server.Blog)
+	r.Get("/shrink", server.Shrink)
 	r.Post("/prompt", server.PostPrompt)
 
-	http.ListenAndServe(":8080", r)
+	http.ListenAndServe(":6900", r)
 }

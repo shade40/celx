@@ -1,0 +1,67 @@
+{{ define "body" }}
+    <tower>
+        <field multiline="true">
+            <style>
+                width: 10
+                height: shrink
+                fill_style: '@black'
+            </style>
+        </field>
+        <row>
+            <style>
+                alignment: [center, center]
+            </style>
+            <button>
+                Add new
+                <script>
+                    function on_submit(self)
+                        find("#content").append(w.Text{"Hello"})
+                    end
+                </script>
+            </button>
+            <button>
+                Remove last
+                <script>
+                    function on_submit(self)
+                        find("#content").pop()
+                    end
+                </script>
+            </button>
+            <button>
+                Swap direction
+                <script>
+                    function on_submit(self)
+                        local content = find("#content")
+
+                        if content.direction.value == "horizontal" then
+                            content.direction = "vertical"
+                        else
+                            content.direction = "horizontal"
+                        end
+                    end
+                </script>
+            </button>
+        </row>
+        <text>$width;$height $dir
+            <style> width: 1.0 </style>
+            <script>
+                function pre_content(self)
+                    local obj = find("Field")
+                    width = obj.computed_width
+                    height = obj.computed_height
+                end
+            </script>
+        </text>
+        <tower eid="content">
+            <style>
+                frame: light
+                alignment: [center, center]
+
+                gap: 0
+                fallback_gap: 0
+                width: shrink+2
+                height: shrink
+            </style>
+        </tower>
+    </tower>
+{{ end }}

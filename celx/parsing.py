@@ -34,6 +34,7 @@ end\
 """
 
 
+# TODO: This breaks `width: shrink` for text
 def lua_formatted_get_content(scope: dict[str, Any]) -> Callable[[Widget], list[str]]:
     """Returns a `get_content` method that formats Lua variables.
 
@@ -137,6 +138,8 @@ def parse_widget(  # pylint: disable=too-many-locals,too-many-branches,too-many-
             key = key.replace("-", "_")
             init[key] = [parse_callback(value)]
             continue
+
+        key = key.replace("-", "_")
 
         if value.isdigit():
             value = int(value)

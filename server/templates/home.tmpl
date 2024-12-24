@@ -1,10 +1,24 @@
 {{ define "body" }}
-    <style> alignment: [center, center] </style>
+    <style>
+        alignment: [center, start]
+        gap: 3
+    </style>
     <row eid="data">
+        <style>
+            height: shrink
+            alignment: [center, start]
+        </style>
         {{ template "counter" . }}
         {{ template "counter" . }}
         {{ template "counter" . }}
     </row>
+    <dropdown title="Select...">
+        <button name="opt-1">Option 1</button>
+        <button disabled="1">--Option 0--</button>
+        <button>Option 2</button>
+        <button>Optionopt tjpt 2</button>
+        <button>Option 3</button>
+    </dropdown>
     <checkbox>Disabled
         <script>
             function on_change(value)
@@ -16,21 +30,59 @@
             end
         </script>
     </checkbox>
-    <dropdown title="Select...">
-        <button name="opt-1">Option 1</button>
-        <button disabled="true">--Option 0--</button>
-        <button>Option 2</button>
-        <button>Option 3</button>
-    </dropdown>
-    <field>Hello</field>
-    <tower groups="fill center">
+    <text>
+        <style>
+            width: 0.5
+            height: 5
+            frame: light
+            overflow: [auto, auto]
+
+            \> Slider.-scroll:
+                cursor_style: 'red'
+
+            \> Slider.-scroll-x:
+                rail: '-'
+                cursor: 'X'
+
+        </style>
+        $val2
+        <script>
+            val1 = 0
+            val2 = ""
+
+            function pre_content(self)
+                val1 = find("Field").value
+                val2 = find("Field").value:gsub("\n", "\\n")
+            end
+        </script>
+    </text>
+    <field multiline="true" scroll-to-cursor="1">
+        <style>
+            width: 28
+            height: 5
+            content_style: red
+        </style>
+Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello
+Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello
+Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello
+Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello
+Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello
+Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello
+Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello
+Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello
+Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello
+Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello Hello
+last line
+    </field>
+    <!--tower groups="fill center">
         <style>
             gap: 0
             frame: [frameless, padded, frameless, padded]
+            width: -1
         </style>
         <tower>
             <style>
-                width: 0.5
+                width: 30
                 gap: 1
             </style>
             <row>
@@ -63,7 +115,9 @@
             <progress value="0.5" groups="tall minimal" />
             <progress value="0.5" groups="tall" />
         </tower>
-    </tower>
+    </tower-->
+    <verticalslider>
+    </verticalslider>
     <row>
         <style> height: 1 </style>
         <button on-submit="GET /; select #data; swap in #body">Reset</button>
