@@ -36,10 +36,7 @@ do table.insert(stack, _ENV)
 LUA_SCRIPT_END = """
 envs[{script_id}] = _ENV
 end _ENV = table.remove(stack)
-
-if _children then
-    table.insert(_children, envs[{script_id}])
-end
+if _children then table.insert(_children, envs[{script_id}]) end
 
 """
 
