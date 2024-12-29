@@ -42,6 +42,10 @@ class HttpApplication(Application):
         self._page = Page()
         self._url = urlparse(domain)
         self._session = Session()
+        self._session.headers = {
+            "Accepts": "text/celx",
+            "CELX_Request": "true",
+        }
         self._current_instructions: list[list[Instruction]] = []
 
         def _clear_instructions(_: Page) -> bool:

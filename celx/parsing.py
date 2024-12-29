@@ -1,12 +1,12 @@
 import re
-from xml.etree.ElementTree import Element
+from xml.etree.ElementTree import Element, tostring as element_to_string
 
 from typing import Any, Callable
 from textwrap import indent, dedent
 
 from celadon import Widget, load_rules, Page
 
-from .lua import lua, WIDGET_TYPES
+from .lua import lua, LuaTable, WIDGET_TYPES
 from .callbacks import parse_callback
 
 STYLE_TEMPLATE = """\
@@ -14,23 +14,33 @@ STYLE_TEMPLATE = """\
 {indented_content}\
 """
 
-LUA_SCRIPT_TEMPLATE = """\
-function(widget)
-    local env = {{}}
-
+LUA_SCRIPT_BEGIN_OUTER = """\
+do table.insert(sandbox.stack, _ENV)
+    scope = {{}}
     for k, v in pairs(sandbox) do
-        env[k] = v
+        scope[k] = v
     end
 
-    local _ENV = env
+    _ENV = sandbox.initScope(scope)
+    env_id = {script_id}
 
-    self = widget
-    styles = styles(widget)
+"""
 
-{indented_content}
+LUA_SCRIPT_BEGIN_INNER = """\
+do table.insert(stack, _ENV)
+    _ENV = initScope(_ENV)
+    env_id = {script_id}
 
-    return _ENV
-end\
+"""
+
+LUA_SCRIPT_END = """
+envs[{script_id}] = _ENV
+end _ENV = table.remove(stack)
+
+if _children then
+    table.insert(_children, envs[{script_id}])
+end
+
 """
 
 
@@ -42,28 +52,13 @@ def lua_formatted_get_content(scope: dict[str, Any]) -> Callable[[Widget], list[
     `$count`.
     """
 
-    def _resolve(word: str, scope: dict[str, Any]) -> str:
-        if "." not in word:
-            return str(scope[word])
-
-        *scopeids, word = word.split(".")
-
-        inner = scope
-
-        for scopeid in scopeids:
-            if scopeid not in inner:
-                raise ValueError(f"unregistered scopeid {scopeid!r}")
-
-            inner = inner[scopeid]
-
-        return str(inner[word])
-
     def _get_content(self: Widget) -> list[str]:
         lines = []
 
         for line in self.__class__.get_content(self):
             in_var = False
             parts = []
+            word = ""
 
             for word in re.split(r"([^a-zA-Z0-9_\.])", line):
                 if word == "$":
@@ -73,7 +68,14 @@ def lua_formatted_get_content(scope: dict[str, Any]) -> Callable[[Widget], list[
                 if in_var:
                     in_var = False
 
-                    word = _resolve(word, scope)
+                    value = scope[word]
+
+                    if value is None:
+                        raise ValueError(
+                            f"unknown variable '{word}' for {self.as_query()}"
+                        )
+
+                    word = str(value)
 
                 parts.append(word)
 
@@ -97,35 +99,59 @@ def parse_rules(text: str, query: str | None = None) -> dict[str, Any]:
     return load_rules(style)
 
 
-def _looser_callback_wrapper(
-    callback: Callable[[Widget | None], bool | None]
-) -> Callable[[Widget], bool]:
-    """Let's Lua create callbacks without arguments or return values.
+def _extract_script(
+    node: Element, node_to_id: dict[Element, int], outer: bool = False, level: int = 0
+) -> str:
+    """Recursively extracts scripts starting from the given node."""
 
-    This is done becaues the Lua scope can usually already access the caller widget
-    using the `self` variable.
-    """
+    code = indent(
+        (LUA_SCRIPT_BEGIN_OUTER if outer else LUA_SCRIPT_BEGIN_INNER).format(
+            script_id=node_to_id[node]
+        ),
+        level * 4 * " ",
+    )
 
-    def _wrapper(data: Widget) -> bool:
-        try:
-            res = callback(data)
-        except TypeError:
-            res = callback(data)
+    for child in node:
+        if child.tag == "style":
+            continue
 
-        if res is not None:
-            return res
+        if child.tag == "script":
+            code += indent(dedent(child.text), (level + 1) * 4 * " ")
+            continue
 
-        # Assume handled if not otherwise stated
-        return True
+        code += _extract_script(child, node_to_id, level=level + 1)
 
-    return _wrapper
+    code += indent(LUA_SCRIPT_END.format(script_id=node_to_id[node]), level * 4 * " ")
+
+    return code
+
+
+def _get_pairs(table: LuaTable) -> list[str]:
+    """Iterates through the `__pairs` of a Lua table."""
+
+    iterator, state, first_key = lua.globals().pairs(table)
+
+    while True:
+        item = iterator(state, first_key)
+
+        if item is None:
+            break
+
+        key, value = item
+
+        yield (key, value)
+        first_key = key
 
 
 # TODO: Technically rules is more like a `dict[str, dict[str, <something>]]`!
-def parse_widget(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def parse_widget(
     node: Element,
+    parse_script: bool = True,
+    result: dict[str, list[Widget, Element]] | None = None,
 ) -> tuple[Widget, dict[str, Any]]:
-    """Parses a widget, its callbacks & its styling from an XML node."""
+    """Parses a widget, its scripts & its styling from an XML node."""
+
+    result = result or {}
 
     init: dict[str, str | tuple[str, ...] | list[Callable[[Widget], bool]]] = {}
 
@@ -170,72 +196,80 @@ def parse_widget(  # pylint: disable=too-many-locals,too-many-branches,too-many-
 
     if text is not None and text.strip() != "":
         # The init args aren't strongly typed.
-        widget = cls(text.strip(), **init)  # type: ignore
+        widget = cls(dedent(text).strip("\n"), **init)  # type: ignore
     else:
         widget = cls(**init)  # type: ignore
 
     query = widget.as_query()
     scope = None
 
-    if (script_node := node.find("script")) is not None:
-        # Set up widget & styles globals
-        code = LUA_SCRIPT_TEMPLATE.format(
-            indented_content=indent(dedent(script_node.text or ""), 4 * " ")
-        )
-
-        try:
-            setup_scope = lua.eval(code)
-
-        except Exception as err:
-            raise ValueError(code) from err
-
-        scope = setup_scope(widget)
-
-        lua.eval("function(widget, scope) sandbox.scopes[widget] = scope end")(
-            widget, scope
-        )
-
-        for key, value in scope.items():
-            if key.startswith(("pre_", "on_")):
-                event = getattr(widget, key)
-
-                if event is None:
-                    raise ValueError(f"invalid event handler {key!r}")
-
-                assert callable(value)
-
-                event += _looser_callback_wrapper(value)
-
-        node.remove(script_node)
-
     rules: dict[str, Any] = {}
 
-    # Save current outer scope
-    old_outer = lua.eval("sandbox.outer")
-    scope = scope or lua.table_from({"outer": lua.eval("sandbox.outer")})
-
-    # Set outer scope to this widget's inner scope
-    lua.eval("function(widget) sandbox.outer = sandbox.scopes[widget] end")(widget)
+    script_id = id(widget)
+    result[script_id] = widget, node
 
     for child in node:
         if child.tag == "style":
             rules.update(**parse_rules(child.text or "", query))
             continue
 
-        parsed, parsed_rules = parse_widget(child)
+        if child.tag == "script":
+            continue
 
-        # This will error at runtime
+        parsed, parsed_rules = parse_widget(child, parse_script=False, result=result)
+        rules.update(**parsed_rules)
         widget += parsed  # type: ignore
 
-        rules.update(**parsed_rules)
+        result[id(parsed)] = parsed, child
 
-    # Set formatted get content for the widget
-    get_content = lua_formatted_get_content(scope)
-    # We're overwriting the `get_content` method intentionally.
-    widget.get_content = get_content.__get__(widget, widget.__class__)  # type: ignore
+    if parse_script:
+        code = _extract_script(
+            node, {node: s_id for s_id, [_, node] in result.items()}, outer=True
+        )
 
-    # Reset outer scope to what it used to be
-    lua.eval("function(scope) sandbox.outer = scope end")(old_outer)
+    if not parse_script:
+        return widget, rules
+
+    sandbox = lua.eval("sandbox")
+    envs = lua.eval("sandbox.envs")
+    setfenv = lua.eval("builtins.setfenv")
+
+    lua.execute(code)
+
+    skipped = []
+
+    for s_id, [widget, _] in reversed(result.items()):
+        env = envs[s_id]
+
+        if env is None:
+            continue
+
+        env.self = widget
+
+        for key, value in _get_pairs(env):
+            if sandbox[key] is not None:
+                continue
+
+            if callable(value) and not env.hasOwn(key):
+                continue
+
+            if key == "init":
+                setfenv(env.init, env)()
+                continue
+
+            if isinstance(key, str) and key.startswith(("pre_", "on_")):
+                event = getattr(widget, key, None)
+
+                if event is None:
+                    raise ValueError(f"invalid event handler {key!r}")
+
+                assert callable(value)
+
+                event += setfenv(value, env)
+
+        # Set formatted get content for the widget
+        get_content = lua_formatted_get_content(env)
+        widget.get_content = get_content.__get__(widget, widget.__class__)  # type: ignore
 
     return widget, rules
 

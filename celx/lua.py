@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Type
+from typing import TYPE_CHECKING, Any, Callable, Type, TypeVar
 
 from lupa import LuaRuntime  # type: ignore # pylint: disable=no-name-in-module
 from celadon import Widget, widgets
@@ -17,6 +17,152 @@ WIDGET_TYPES = {
     for key, value in vars(widgets).items()
     if isinstance(value, type) and issubclass(value, Widget)
 }
+
+LuaTable = TypeVar("LuaTable")
+
+LUA_SCOPE_SETUP = """
+builtins = {
+    ipairs = ipairs,
+    next = next,
+    pairs = pairs,
+    pcall = pcall,
+    tonumber = tonumber,
+    tostring = tostring,
+    type = type,
+    unpack = unpack,
+    coroutine = { create = coroutine.create, resume = coroutine.resume,
+        running = coroutine.running, status = coroutine.status,
+        wrap = coroutine.wrap },
+    string = { byte = string.byte, char = string.char, find = string.find,
+        format = string.format, gmatch = string.gmatch, gsub = string.gsub,
+        len = string.len, lower = string.lower, match = string.match,
+        rep = string.rep, reverse = string.reverse, sub = string.sub,
+        upper = string.upper },
+    table = { insert = table.insert, maxn = table.maxn, remove = table.remove,
+        sort = table.sort },
+    math = { abs = math.abs, acos = math.acos, asin = math.asin,
+        atan = math.atan, atan2 = math.atan2, ceil = math.ceil, cos = math.cos,
+        cosh = math.cosh, deg = math.deg, exp = math.exp, floor = math.floor,
+        fmod = math.fmod, frexp = math.frexp, huge = math.huge,
+        ldexp = math.ldexp, log = math.log, log10 = math.log10, max = math.max,
+        min = math.min, modf = math.modf, pi = math.pi, pow = math.pow,
+        rad = math.rad, random = math.random, sin = math.sin, sinh = math.sinh,
+        sqrt = math.sqrt, tan = math.tan, tanh = math.tanh },
+    os = { clock = os.clock, difftime = os.difftime, time = os.time },
+    copy = copy, 
+    setmetatable = setmetatable,
+    print = print,
+    error = error,
+    dump_keys = function(t)
+        local result = ""
+
+        for k, _ in pairs(t) do
+            result = result .. k .. ", "
+        end
+
+        return result
+    end,
+    setfenv = function(fn, env)
+        local i = 1
+        while true do
+            local name = debug.getupvalue(fn, i)
+            if name == "_ENV" then
+                debug.upvaluejoin(fn, i, (function()
+                    return env
+                end), 1)
+                break
+            elseif not name then
+                break
+            end
+
+            i = i + 1
+        end
+
+        return fn
+    end,
+}
+
+sandbox = {
+    builtins = builtins,
+    stack = {},
+    envs = {},
+
+    initScope = function(hiddenScope)
+        local innerScope = {}
+
+        local _listeners = {}
+        local _children = {}
+
+        return setmetatable({
+            on_change = function(field, callback)
+                if _listeners[field] == nil then
+                    _listeners[field] = {}
+                end
+
+                table.insert(_listeners[field], callback)
+            end,
+            hasOwn = function(k)
+                return innerScope[k] ~= nil
+            end,
+
+            _children = _children,
+            _listeners = _listeners,
+        }, {
+            __index = function(t, k)
+                if innerScope[k] ~= nil then
+                    return innerScope[k]
+                end
+
+                if hiddenScope[k] ~= nil then
+                    return hiddenScope[k]
+                end
+                
+                return builtins[k]
+            end,
+
+            __pairs = function(t)
+                local merged = {{}}
+
+                for k, v in pairs(hiddenScope) do
+                    merged[k] = v
+                end
+
+                for k, v in pairs(innerScope) do
+                    merged[k] = v
+                end
+
+                return pairs(merged)
+            end,
+
+            __newindex = function(t, k, v)
+                local current = hiddenScope[k]
+
+                if current ~= nil then
+                    hiddenScope[k] = v
+                else
+                    innerScope[k] = v
+                end
+
+                if current ~= v and _listeners[k] ~= nil then
+                    for _, callback in ipairs(_listeners[k]) do
+                        builtins.setfenv(callback, t)(v)
+                    end
+
+                    for _, subenv in ipairs(_children) do
+                        local listeners = subenv._listeners[k]
+
+                        if listeners ~= nil then
+                            for _, callback in pairs(listeners) do
+                                builtins.setfenv(callback, subenv)(v)
+                            end
+                        end
+                    end
+                end
+            end,
+        })
+    end
+}
+"""
 
 
 def _attr_filter(_, attr, __):
@@ -173,8 +319,7 @@ def _prompt(
     app.pin(dialogue)
 
 
-# TODO: This takes a lua table, not "Any"!
-def _widget_factory(typ: Type[Widget]) -> Callable[[Any], Widget]:
+def _widget_factory(typ: Type[Widget]) -> Callable[[LuaTable], Widget]:
     """Lets Lua instantiate widgets.
 
     ```
@@ -182,7 +327,7 @@ def _widget_factory(typ: Type[Widget]) -> Callable[[Any], Widget]:
     ```
     """
 
-    def _create(options) -> Widget:
+    def _create(options: LuaTable) -> Widget:
         args = []
         kwargs = {}
 
@@ -207,68 +352,47 @@ def _widget_factory(typ: Type[Widget]) -> Callable[[Any], Widget]:
 
     return _create
 
+def _env_getter(envs: LuaTable) -> Callable[[Widget], LuaTable]:
+    def _inner(widget: Widget) -> LuaTable:
+        return envs[id(widget)] 
+
+    return _inner
 
 def init_runtime(runtime: LuaRuntime, app: "HttpApplication") -> None:
     """Sets up the global namespace for the given runtime."""
 
-    runtime.execute(
-        """
-        sandbox = {
-          ipairs = ipairs,
-          next = next,
-          pairs = pairs,
-          pcall = pcall,
-          tonumber = tonumber,
-          tostring = tostring,
-          type = type,
-          unpack = unpack,
-          coroutine = { create = coroutine.create, resume = coroutine.resume,
-              running = coroutine.running, status = coroutine.status,
-              wrap = coroutine.wrap },
-          string = { byte = string.byte, char = string.char, find = string.find,
-              format = string.format, gmatch = string.gmatch, gsub = string.gsub,
-              len = string.len, lower = string.lower, match = string.match,
-              rep = string.rep, reverse = string.reverse, sub = string.sub,
-              upper = string.upper },
-          table = { insert = table.insert, maxn = table.maxn, remove = table.remove,
-              sort = table.sort },
-          math = { abs = math.abs, acos = math.acos, asin = math.asin,
-              atan = math.atan, atan2 = math.atan2, ceil = math.ceil, cos = math.cos,
-              cosh = math.cosh, deg = math.deg, exp = math.exp, floor = math.floor,
-              fmod = math.fmod, frexp = math.frexp, huge = math.huge,
-              ldexp = math.ldexp, log = math.log, log10 = math.log10, max = math.max,
-              min = math.min, modf = math.modf, pi = math.pi, pow = math.pow,
-              rad = math.rad, random = math.random, sin = math.sin, sinh = math.sinh,
-              sqrt = math.sqrt, tan = math.tan, tanh = math.tanh },
-          os = { clock = os.clock, difftime = os.difftime, time = os.time },
-          scopes = {},
-        }
-        """
-    )
+    runtime.execute(LUA_SCOPE_SETUP)
 
-    inject = lua.eval("function(obj, name) sandbox[name] = obj end")
+    sandbox = lua.globals().sandbox
 
-    inject({"alias": zml_alias, "define": _zml_define, "escape": zml_escape}, "zml")
-    inject(app.timeout, "timeout")
-    inject(_chocl, "chocl")
-
-    inject(partial(_alert, app), "alert")
-    inject(partial(_confirm, app), "confirm")
-    inject(partial(_prompt, app), "prompt")
-    # inject(app.find, "find")
-    # inject(app.find_all, "find_all")
-
-    inject(partial(_multi_find, app), "find")
-
-    inject(LuaStyleWrapper, "styles")
-    inject(
-        {key.title(): _widget_factory(value) for key, value in WIDGET_TYPES.items()},
-        "w",
-    )
+    sandbox.env = _env_getter(sandbox.envs)
+    sandbox.zml = {"alias": zml_alias, "define": _zml_define, "escape": zml_escape}
+    sandbox.timeout = app.timeout
+    sandbox.chocl = _chocl
+    sandbox.alert = partial(_alert, app)
+    sandbox.confirm = partial(_confirm, app)
+    sandbox.prompt = partial(_prompt, app)
+    sandbox.find = partial(_multi_find, app)
+    sandbox.styles = LuaStyleWrapper
+    sandbox.w = {
+        key.title(): _widget_factory(value) for key, value in WIDGET_TYPES.items()
+    }
 
 
-lua = LuaRuntime(
+class LoggedLuaRuntime(LuaRuntime):
+    FILE = "debug.lua"
+
+    def execute(self, code: str, **kwargs) -> Any:
+        if self.FILE:
+            with open(self.FILE, "a") as f:
+                f.write(code + "\n")
+
+        return super().execute(code, **kwargs)
+
+
+lua = LoggedLuaRuntime(
     register_eval=False,
     register_builtins=False,
+    unpack_returned_tuples=True,
     attribute_filter=_attr_filter,
 )
