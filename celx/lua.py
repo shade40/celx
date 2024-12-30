@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable, Type, TypeVar
 
 from lupa import LuaRuntime  # type: ignore # pylint: disable=no-name-in-module
 from celadon import Widget, widgets
-from zenith import zml_alias, zml_macro, MacroType, zml_escape
+from zenith import zml_alias, zml_macro, MacroType, zml_escape, zml_expand_aliases
 
 from .callbacks import parse_callback
 
@@ -352,11 +352,13 @@ def _widget_factory(typ: Type[Widget]) -> Callable[[LuaTable], Widget]:
 
     return _create
 
+
 def _env_getter(envs: LuaTable) -> Callable[[Widget], LuaTable]:
     def _inner(widget: Widget) -> LuaTable:
-        return envs[id(widget)] 
+        return envs[id(widget)]
 
     return _inner
+
 
 def init_runtime(runtime: LuaRuntime, app: "HttpApplication") -> None:
     """Sets up the global namespace for the given runtime."""
@@ -366,7 +368,12 @@ def init_runtime(runtime: LuaRuntime, app: "HttpApplication") -> None:
     sandbox = lua.globals().sandbox
 
     sandbox.env = _env_getter(sandbox.envs)
-    sandbox.zml = {"alias": zml_alias, "define": _zml_define, "escape": zml_escape}
+    sandbox.zml = {
+        "alias": zml_alias,
+        "define": _zml_define,
+        "escape": zml_escape,
+        "expand_aliases": zml_expand_aliases,
+    }
     sandbox.timeout = app.timeout
     sandbox.chocl = _chocl
     sandbox.alert = partial(_alert, app)

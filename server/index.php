@@ -39,7 +39,9 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
                             color = over
                         end
 
-                        return string.format("[%s]%s", color, text)
+                        return zml.expand_aliases(string.format(
+                            "[%s]%s", color, text
+                        ))
                     end)
 
                     zml.define("random", function(fmt, minval, maxval)
@@ -61,7 +63,7 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
             <text eid="friend">
                 [bold]Primary color: [/fg @main.primary]<?= $primary ?>[/]
 
-                GCount: [!threshold(g_count,lime,10,tomato)]$g_count[/]
+                GCount: [!threshold(g_count,main.success,10,main.error)]$g_count[/]
                 [!random(0,100)]Random: %i[/]
             </text>
             <row>
