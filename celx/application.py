@@ -3,6 +3,8 @@ from typing import Any, Callable
 from threading import Thread
 from urllib.parse import urlparse
 
+from xml.dom.minidom import parseString
+from xml.parsers.expat import ExpatError
 from xml.etree.ElementTree import fromstring as ElementTree, Element
 
 from celadon import Application, Page, Widget, Container
@@ -89,7 +91,7 @@ class HttpApplication(Application):
         if method is HTTPMethod.GET:
             request_data = {"params": data}
         else:
-            request_data = {"json": data}
+            request_data = {"data": data}
 
         if not isinstance(method, HTTPMethod):
             self._error(TypeError(f"Invalid method {method!r}."))
@@ -108,8 +110,17 @@ class HttpApplication(Application):
             if url.netloc != self._url.netloc:
                 self._url = url
 
-            tree = ElementTree(resp.text)
+            # Wrap invalid XML as text
+            # TODO: Treat response differently based on Content-Type
+            xml = resp.text
 
+            try:
+                _ = parseString(xml)
+            except ExpatError:
+                xml = f"<text>{xml}</text>"
+
+            tree = ElementTree(xml)
+            
             for sourceable in ["style", "script"]:
                 for node in tree.findall(f".//{sourceable}[@src]"):
                     resp = self._session.get(self._prefix_endpoint(node.attrib["src"]))
@@ -234,7 +245,7 @@ class HttpApplication(Application):
                     if instr.verb is Verb.SWAP:
                         offsets = {"before": -1, None: 0, "after": 1}
 
-                        if modifier == "in":
+                        if modifier == "IN":
                             target.update_children([result])
 
                         elif modifier in offsets:
@@ -254,7 +265,7 @@ class HttpApplication(Application):
                             )
 
                     elif instr.verb is Verb.INSERT:
-                        if modifier == "in":
+                        if modifier == "IN":
                             target.insert(0, result)
 
                         else:
@@ -276,7 +287,7 @@ class HttpApplication(Application):
                             target.parent.insert(offsets[modifier], result)
 
                     elif instr.verb is Verb.APPEND:
-                        if modifier != "in":
+                        if modifier != "IN":
                             raise ValueError(
                                 f"unknown modifier {modifier!r} for verb {instr.verb!r}"
                             )

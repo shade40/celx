@@ -1,6 +1,7 @@
 import re
 from xml.etree.ElementTree import Element, tostring as element_to_string
 
+import lupa
 from typing import Any, Callable
 from textwrap import indent, dedent
 
@@ -40,6 +41,7 @@ if _children then table.insert(_children, envs[{script_id}]) end
 
 """
 
+EVENT_PREFIXES = ("on", "pre")
 
 # TODO: This breaks `width: shrink` for text
 def lua_formatted_get_content(scope: dict[str, Any]) -> Callable[[Widget], list[str]]:
@@ -139,7 +141,6 @@ def _get_pairs(table: LuaTable) -> list[str]:
         yield (key, value)
         first_key = key
 
-
 # TODO: Technically rules is more like a `dict[str, dict[str, <something>]]`!
 def parse_widget(
     node: Element,
@@ -151,15 +152,29 @@ def parse_widget(
     result = result or {}
 
     init: dict[str, str | tuple[str, ...] | list[Callable[[Widget], bool]]] = {}
+    lua_callbacks = []
 
     for key, value in node.attrib.items():
         if key == "groups":
             init["groups"] = tuple(value.split(" "))
             continue
 
-        if key.startswith("on-"):
+        if key.startswith(EVENT_PREFIXES):
             key = key.replace("-", "_")
-            init[key] = [parse_callback(value)]
+
+            if value.startswith(":"):
+                init[key] = [parse_callback(value)]
+
+            else:
+                script_node = node.find("script")
+
+                if script_node == None:
+                    script_node = Element("script")
+                    script_node.text = ""
+
+                script_node.text += f"function {key}() {value} end\n\n"
+                node.append(script_node)
+
             continue
 
         key = key.replace("-", "_")
@@ -231,7 +246,11 @@ def parse_widget(
     envs = lua.eval("sandbox.envs")
     setfenv = lua.eval("builtins.setfenv")
 
-    lua.execute(code)
+    try:
+        lua.execute(code)
+    except lupa.LuaSyntaxError as exc:
+        # TODO: This could alert() instead and abort exec
+        raise exc
 
     skipped = []
 
@@ -254,7 +273,7 @@ def parse_widget(
                 setfenv(env.init, env)()
                 continue
 
-            if isinstance(key, str) and key.startswith(("pre_", "on_")):
+            if isinstance(key, str) and key.startswith(EVENT_PREFIXES):
                 event = getattr(widget, key, None)
 
                 if event is None:

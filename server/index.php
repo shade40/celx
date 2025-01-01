@@ -60,12 +60,23 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
                     g_count = count
                 end)
             </script>
-            <text eid="friend">
+            <text>
                 [bold]Primary color: [/fg @main.primary]<?= $primary ?>[/]
 
                 GCount: [!threshold(g_count,main.success,10,main.error)]$g_count[/]
                 [!random(0,100)]Random: %i[/]
             </text>
+            <tower pre-content="drawcount = drawcount + 1">
+                <script>
+                    drawcount = 0
+                </script>
+                <text>Drawn: $drawcount times</text>
+                <style> frame: rounded </style>
+                <field eid="friend" name="content" multiline="true">
+                </field>
+                <button on-submit=":POST /lua; SWAP IN #output">Run</button>
+                <tower eid="output"></tower>
+            </tower>
             <row>
                 <style>
                     alignment: [center, start]
@@ -75,18 +86,15 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
                 <script>
                     count = 0
                 </script>
-                <button>
+                <button on-submit="count = count - 1">
                     Remove!
-                    <script>
-                        function on_submit() count = count - 1 end
-                    </script>
                 </button>
                 <text>Clicked $count times</text>
-                <button>
+                <button on-submit="count = count + 1">
                     Add!
-                    <script>
-                        function on_submit() count = count + 1 end
-                    </script>
+                </button>
+                <button on-submit=":POST /count; swap in #output">
+                    Submit
                 </button>
             </row> 
             <text>[bold]Imagine this is a form</text>
@@ -95,7 +103,7 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
                     width: 80
                     gap: 1
                     overflow: [hide, auto]
-                    frame: horizontalouter
+                    frame: verticalouter
                 </style>
                 <field>This is some text</field>
                 <field>This is some more text</field>

@@ -67,10 +67,16 @@ def parse_callback(text: str) -> Callable[[Widget], bool]:
     lines = re.split("[;\n]", text)
 
     instructions = []
+    first = True
 
     for line in lines:
         verb_str, *args = line.strip().split()
-        verb = Verb(verb_str.upper())
+        verb = Verb(verb_str.upper().lstrip(":"))
+
+        if first and verb.value not in HTTPMethod.__members__:
+            raise ValueError(f"first verb must be an HTTP method, got {verb!r}")
+
+        first = False
 
         if verb is Verb.SELECT:
             if len(args) > 1:
@@ -87,6 +93,7 @@ def parse_callback(text: str) -> Callable[[Widget], bool]:
 
             if len(args) == 2:
                 modifier, arg = args
+                modifier = modifier.upper()
 
             instructions.append(Instruction(verb, [arg, modifier]))
 
