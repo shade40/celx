@@ -17,6 +17,37 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
             Palette/main:
                 primary: "<?= $primary ?>"
         </style>
+        <component name="counter" value="0" min="0" max="10">
+            <row eid="friend">
+                <style>
+                    gap: 1
+                    height: shrink
+                </style>
+                <script>
+                    value = $value
+
+                    function add(num)
+                        value = math.min(math.max(value + num, $min), $max)
+                    end
+                </script>
+                <_slot />
+                <button on-submit="add(-1)"> - </button>
+                <text>$value</text>
+                <button on-submit="add(1)"> + </button>
+            </row>
+        </component>
+        <component name="counters">
+            <tower>
+                <style>
+                    gap: 0
+                    height: shrink
+                </style>
+                <_slot />
+                <counter />
+                <counter />
+                <counter />
+            </tower>
+        </component>
         <tower>
             <style>
                 alignment: [center, center]
@@ -67,16 +98,19 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
                 [!random(0,100)]Random: %i[/]
             </text>
             <tower pre-content="drawcount = drawcount + 1">
-                <script>
-                    drawcount = 0
-                </script>
+                <script> drawcount = 0 </script>
                 <text>Drawn: $drawcount times</text>
                 <style> frame: rounded </style>
-                <field eid="friend" name="content" multiline="true">
+                <field name="content" multiline="true">
                 </field>
                 <button on-submit=":POST /lua; SWAP IN #output">Run</button>
                 <tower eid="output"></tower>
             </tower>
+            <counter value="2" max="20"/>
+            <counters>
+                <text>[bold]This is a title</text>
+                <counter value="69"/>
+            </counters>
             <row>
                 <style>
                     alignment: [center, start]
@@ -90,12 +124,20 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
                     Remove!
                 </button>
                 <text>Clicked $count times</text>
-                <button on-submit="count = count + 1">
-                    Add!
+
+                <button on-submit="count = count + 1"> Add! </button>
+
+                <button>
+                    Add
+                    <script>
+                        function on_submit()
+                            count = count + 1
+                        end
+                    </script>
                 </button>
-                <button on-submit=":POST /count; swap in #output">
-                    Submit
-                </button>
+
+                <button on-submit=":POST /add; SWAP IN self"> Submit </button>
+
             </row> 
             <text>[bold]Imagine this is a form</text>
             <tower>

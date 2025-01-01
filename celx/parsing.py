@@ -1,7 +1,8 @@
 import re
-from xml.etree.ElementTree import Element, tostring as element_to_string
+from lxml.etree import Element, tostring as element_to_string
 
 import lupa
+from copy import deepcopy
 from typing import Any, Callable
 from textwrap import indent, dedent
 
@@ -144,6 +145,7 @@ def _get_pairs(table: LuaTable) -> list[str]:
 # TODO: Technically rules is more like a `dict[str, dict[str, <something>]]`!
 def parse_widget(
     node: Element,
+    components: dict[str, tuple[dict[str, Any], str]],
     parse_script: bool = True,
     result: dict[str, list[Widget, Element]] | None = None,
 ) -> tuple[Widget, dict[str, Any]]:
@@ -152,7 +154,41 @@ def parse_widget(
     result = result or {}
 
     init: dict[str, str | tuple[str, ...] | list[Callable[[Widget], bool]]] = {}
-    lua_callbacks = []
+
+    if node.tag in components:
+        params, replacement = components[node.tag]
+        replacement = deepcopy(replacement)
+
+        script = replacement.find("script")
+
+        if script is None:
+            script = Element("script")
+            script.text = ""
+
+            node.append(script)
+
+        for key, value in params.items():
+            script.text = script.text.replace(
+                f"${key}", node.get(key, default=value)
+            )
+
+        slot = replacement.find("_slot")
+
+        if slot is not None:
+            slot_idx = [*replacement].index(slot)
+            replacement.remove(slot)
+
+            content = [*node]
+
+            for i, child in enumerate(content):
+                replacement[max(slot_idx - 1 + i, 0)].addnext(child)
+
+        parent = node.getparent()
+        idx = [*parent].index(node)
+
+        node = replacement
+        parent[idx] = replacement
+
 
     for key, value in node.attrib.items():
         if key == "groups":
@@ -168,7 +204,7 @@ def parse_widget(
             else:
                 script_node = node.find("script")
 
-                if script_node == None:
+                if script_node is None:
                     script_node = Element("script")
                     script_node.text = ""
 
@@ -228,11 +264,12 @@ def parse_widget(
         if child.tag == "script":
             continue
 
-        parsed, parsed_rules = parse_widget(child, parse_script=False, result=result)
+        parsed, parsed_rules = parse_widget(child, components, parse_script=False, result=result)
         rules.update(**parsed_rules)
         widget += parsed  # type: ignore
 
-        result[id(parsed)] = parsed, child
+        if child.tag in WIDGET_TYPES:
+            result[id(parsed)] = parsed, child
 
     if parse_script:
         code = _extract_script(
@@ -252,8 +289,6 @@ def parse_widget(
         # TODO: This could alert() instead and abort exec
         raise exc
 
-    skipped = []
-
     for s_id, [widget, _] in reversed(result.items()):
         env = envs[s_id]
 
@@ -266,11 +301,14 @@ def parse_widget(
             if sandbox[key] is not None:
                 continue
 
-            if callable(value) and not env.hasOwn(key):
-                continue
+            if callable(value):
+                if not env.hasOwn(key):
+                    continue
+
+                value = setfenv(value, env)
 
             if key == "init":
-                setfenv(env.init, env)()
+                value()
                 continue
 
             if isinstance(key, str) and key.startswith(EVENT_PREFIXES):
@@ -281,7 +319,7 @@ def parse_widget(
 
                 assert callable(value)
 
-                event += setfenv(value, env)
+                event += value
 
         # Set formatted get content for the widget
         get_content = lua_formatted_get_content(env)
@@ -290,7 +328,7 @@ def parse_widget(
     return widget, rules
 
 
-def parse_page(node: Element) -> Page:
+def parse_page(node: Element, components: dict[str, str]) -> Page:
     """Parses a page, its scripts & its children from XML node."""
 
     page_node = node.find("page")
@@ -302,8 +340,25 @@ def parse_page(node: Element) -> Page:
     page = Page(**page_node.attrib)  # type: ignore
 
     for child in page_node:
-        if child.tag in WIDGET_TYPES:
-            widget, rules = parse_widget(child)
+        if child.tag == "component":
+            name = None
+            params = {}
+
+            for key, value in child.attrib.items():
+                if key == "name":
+                    name = value
+                    continue
+
+                params[key] = value
+
+            if name is None:
+                raise ValueError("components must have a name.")
+
+            components[name] = params, child[0]
+            continue
+
+        if child.tag in WIDGET_TYPES or child.tag in components:
+            widget, rules = parse_widget(child, components)
             page += widget
 
             for selector, rule in rules.items():

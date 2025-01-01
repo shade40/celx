@@ -3,9 +3,9 @@ from typing import Any, Callable
 from threading import Thread
 from urllib.parse import urlparse
 
+from lxml.etree import fromstring as ElementTree, Element
 from xml.dom.minidom import parseString
 from xml.parsers.expat import ExpatError
-from xml.etree.ElementTree import fromstring as ElementTree, Element
 
 from celadon import Application, Page, Widget, Container
 from requests import Session
@@ -41,6 +41,7 @@ class HttpApplication(Application):
 
         init_runtime(lua, self)
 
+        self._registered_components = {}
         self._page = Page()
         self._url = urlparse(domain)
         self._session = Session()
@@ -143,7 +144,7 @@ class HttpApplication(Application):
         """Routes to a page loaded from the given XML."""
 
         try:
-            page = parse_page(node)
+            page = parse_page(node, self._registered_components)
 
         except Exception as exc:  # pylint: disable=broad-exception-caught
             self._error(exc)
