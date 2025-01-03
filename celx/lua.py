@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Type, TypeVar
+from textwrap import dedent
 
 from lupa import LuaRuntime  # type: ignore # pylint: disable=no-name-in-module
 from celadon import Widget, widgets
@@ -52,6 +53,7 @@ builtins = {
     setmetatable = setmetatable,
     print = print,
     error = error,
+    debug = { getupvalue = debug.getupvalue, upvaluejoin = debug.upvaluejoin },
     dump_keys = function(t)
         local result = ""
 
@@ -169,9 +171,12 @@ sandbox = {
 
                 table.insert(_listeners[field], callback)
             end,
+
             hasOwn = function(k)
                 return innerScope[k] ~= nil
             end,
+
+            builtins = builtins,
 
             _children = _children,
             _listeners = _listeners,
@@ -187,7 +192,7 @@ sandbox = {
                     value = builtins[k]
                 end
 
-                if type(value) == "function" then
+                if builtins.type(value) == "function" then
                     builtins.setfenv(value, t)
                 end
 
@@ -394,6 +399,17 @@ def init_runtime(runtime: LuaRuntime, app: "HttpApplication") -> None:
         key.title(): _widget_factory(sandbox.envs, value)
         for key, value in WIDGET_TYPES.items()
     }
+
+    runtime.execute(dedent("""
+        do table.insert(sandbox.stack, _ENV)
+            scope = {}
+            for k, v in pairs(sandbox) do
+                scope[k] = v
+            end
+
+            sandbox.envs[0] = sandbox.initScope(scope)
+        end
+    """))
 
 
 class LoggedLuaRuntime(LuaRuntime):

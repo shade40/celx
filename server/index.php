@@ -13,6 +13,7 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
 ?>
 <celx version="1.0">
     <page title="home">
+        <complib src="/counters.xml"/>
         <style>
             Palette/main:
                 primary: "<?= $primary ?>"
@@ -20,7 +21,6 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
             Text.body:
                 overflow: [auto, auto]
         </style>
-        <complib src="/counters.xml"/>
         <tower>
             <style>
                 alignment: [center, center]

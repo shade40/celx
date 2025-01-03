@@ -16,19 +16,7 @@ STYLE_TEMPLATE = """\
 {indented_content}\
 """
 
-LUA_SCRIPT_BEGIN_OUTER = """\
-do table.insert(sandbox.stack, _ENV)
-    scope = {{}}
-    for k, v in pairs(sandbox) do
-        scope[k] = v
-    end
-
-    _ENV = sandbox.initScope(scope)
-    env_id = {script_id}
-
-"""
-
-LUA_SCRIPT_BEGIN_INNER = """\
+LUA_SCRIPT_BEGIN = """\
 do table.insert(stack, _ENV)
     _ENV = initScope(_ENV)
     env_id = {script_id}
@@ -104,8 +92,13 @@ def _extract_script(
 ) -> str:
     """Recursively extracts scripts starting from the given node."""
 
-    code = indent(
-        (LUA_SCRIPT_BEGIN_OUTER if outer else LUA_SCRIPT_BEGIN_INNER).format(
+    code = ""
+
+    if outer:
+        code += "_ENV = sandbox.envs[0]\n\n"
+
+    code += indent(
+        LUA_SCRIPT_BEGIN.format(
             script_id=node_to_id[node]
         ),
         level * 4 * " ",
