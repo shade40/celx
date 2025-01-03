@@ -1,0 +1,33 @@
+<complib namespace="form">
+    <component name="counter" value="0" min="0" max="10">
+        <row eid="friend">
+            <style>
+                gap: 1
+                height: shrink
+            </style>
+            <script>
+                value = $value
+
+                function add(num)
+                    value = math.min(math.max(value + num, $min), $max)
+                end
+            </script>
+            <_slot />
+            <button on-submit="add(-1)"> - </button>
+            <text>$value</text>
+            <button on-submit="add(1)"> + </button>
+        </row>
+    </component>
+    <component name="counters">
+        <tower>
+            <style>
+                gap: 0
+                height: shrink
+            </style>
+            <_slot />
+            <form.counter />
+            <form.counter />
+            <form.counter />
+        </tower>
+    </component>
+</complib>

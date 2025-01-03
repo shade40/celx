@@ -17,37 +17,7 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
             Palette/main:
                 primary: "<?= $primary ?>"
         </style>
-        <component name="counter" value="0" min="0" max="10">
-            <row eid="friend">
-                <style>
-                    gap: 1
-                    height: shrink
-                </style>
-                <script>
-                    value = $value
-
-                    function add(num)
-                        value = math.min(math.max(value + num, $min), $max)
-                    end
-                </script>
-                <_slot />
-                <button on-submit="add(-1)"> - </button>
-                <text>$value</text>
-                <button on-submit="add(1)"> + </button>
-            </row>
-        </component>
-        <component name="counters">
-            <tower>
-                <style>
-                    gap: 0
-                    height: shrink
-                </style>
-                <_slot />
-                <counter />
-                <counter />
-                <counter />
-            </tower>
-        </component>
+        <complib src="/counters.xml"/>
         <tower>
             <style>
                 alignment: [center, center]
@@ -106,11 +76,11 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
                 <button on-submit=":POST /lua; SWAP IN #output">Run</button>
                 <tower eid="output"></tower>
             </tower>
-            <counter value="2" max="20"/>
-            <counters>
+            <form.counter value="2" max="20"/>
+            <form.counters>
                 <text>[bold]This is a title</text>
-                <counter value="69"/>
-            </counters>
+                <form.counter value="69"/>
+            </form.counters>
             <row>
                 <style>
                     alignment: [center, start]

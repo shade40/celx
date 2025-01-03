@@ -122,7 +122,7 @@ class HttpApplication(Application):
 
             tree = ElementTree(xml)
             
-            for sourceable in ["style", "script"]:
+            for sourceable in ["style", "script", "complib"]:
                 for node in tree.findall(f".//{sourceable}[@src]"):
                     resp = self._session.get(self._prefix_endpoint(node.attrib["src"]))
 
@@ -130,7 +130,17 @@ class HttpApplication(Application):
                         self.stop()
                         resp.raise_for_status()
 
-                    node.text = resp.text
+                    if sourceable == "complib":
+                        sourced = ElementTree(resp.text)
+                        for child in sourced:
+                            node.append(child)
+
+                        for key, value in sourced.attrib.items():
+                            node.attrib[key] = value
+                            
+                    else:
+                        node.text = resp.text
+
                     del node.attrib["src"]
 
             return handler(tree)

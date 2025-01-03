@@ -189,7 +189,6 @@ def parse_widget(
         node = replacement
         parent[idx] = replacement
 
-
     for key, value in node.attrib.items():
         if key == "groups":
             init["groups"] = tuple(value.split(" "))
@@ -327,6 +326,24 @@ def parse_widget(
 
     return widget, rules
 
+def _register_component(node: Element, components: dict[str, str], namespace: str | None = None) -> None:
+    name = None
+    params = {}
+
+    for key, value in node.attrib.items():
+        if key == "name":
+            name = value
+            continue
+
+        params[key] = value
+
+    if name is None:
+        raise ValueError("components must have a name.")
+
+    if namespace is not None:
+        name = namespace + "." + name
+
+    components[name] = params, node[0]
 
 def parse_page(node: Element, components: dict[str, str]) -> Page:
     """Parses a page, its scripts & its children from XML node."""
@@ -340,21 +357,16 @@ def parse_page(node: Element, components: dict[str, str]) -> Page:
     page = Page(**page_node.attrib)  # type: ignore
 
     for child in page_node:
+        if child.tag == "complib":
+            namespace = child.get("namespace")
+
+            for inner in child:
+                _register_component(inner, components, namespace)
+
+            continue
+
         if child.tag == "component":
-            name = None
-            params = {}
-
-            for key, value in child.attrib.items():
-                if key == "name":
-                    name = value
-                    continue
-
-                params[key] = value
-
-            if name is None:
-                raise ValueError("components must have a name.")
-
-            components[name] = params, child[0]
+            _register_component(child, components)
             continue
 
         if child.tag in WIDGET_TYPES or child.tag in components:
