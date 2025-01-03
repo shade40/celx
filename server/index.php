@@ -16,6 +16,9 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
         <style>
             Palette/main:
                 primary: "<?= $primary ?>"
+
+            Text.body:
+                overflow: [auto, auto]
         </style>
         <complib src="/counters.xml"/>
         <tower>
@@ -110,6 +113,18 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
 
             </row> 
             <text>[bold]Imagine this is a form</text>
+            <button
+                on-submit="
+                    confirm('A question?', 'soething', function()
+                        dialogue = true
+                        alert(self)
+                    end)
+                "
+            >
+                <script> dialogue = false </script>
+                test $dialogue
+            </button>
+
             <tower>
                 <style>
                     width: 80

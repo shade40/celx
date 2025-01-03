@@ -29,7 +29,6 @@ builtins = {
     tonumber = tonumber,
     tostring = tostring,
     type = type,
-    unpack = unpack,
     coroutine = { create = coroutine.create, resume = coroutine.resume,
         running = coroutine.running, status = coroutine.status,
         wrap = coroutine.wrap },
@@ -39,7 +38,7 @@ builtins = {
         rep = string.rep, reverse = string.reverse, sub = string.sub,
         upper = string.upper },
     table = { insert = table.insert, maxn = table.maxn, remove = table.remove,
-        sort = table.sort },
+        sort = table.sort, unpack = table.unpack },
     math = { abs = math.abs, acos = math.acos, asin = math.asin,
         atan = math.atan, atan2 = math.atan2, ceil = math.ceil, cos = math.cos,
         cosh = math.cosh, deg = math.deg, exp = math.exp, floor = math.floor,
@@ -57,7 +56,16 @@ builtins = {
         local result = ""
 
         for k, _ in pairs(t) do
-            result = result .. k .. ", "
+            result = result .. tostring(k) .. ", "
+        end
+
+        return result
+    end,
+    dump_values = function(t)
+        local result = ""
+
+        for _, v in pairs(t) do
+            result = result .. tostring(v) .. ", "
         end
 
         return result
@@ -84,8 +92,68 @@ builtins = {
 
 sandbox = {
     builtins = builtins,
+    app = nil,
     stack = {},
     envs = {},
+
+    alert = function(text)
+        local text = tostring(text)
+
+        app.pin(w.Dialogue{
+            w.Text{text, group="body"},
+            w.Row{
+                w.Button{"Close", on_submit={
+                    function() app.remove_pinned() end
+                }},
+                group="input",
+            }
+        })
+    end,
+
+    confirm = function(title, body, callback)
+        app.pin(w.Dialogue{
+            w.Text{title, group="title"},
+            w.Text{body, group="body"},
+            w.Row{
+                w.Button{
+                    "Confirm",
+                    on_submit={function()
+                        app.remove_pinned()
+                        callback(true)
+                    end}
+                },
+                w.Button{
+                    "Deny",
+                    on_submit={function()
+                        app.remove_pinned()
+                        callback(false)
+                    end}
+                },
+                group="input"
+            }
+        })
+    end,
+
+    prompt = function(title, body, callback)
+        app.pin(w.Dialogue{
+            w.Text{tostring(title)},
+            w.Tower{group="body", table.unpack(body)},
+            w.Row{
+                w.Button{"Submit", on_submit={function()
+                    callback(app.remove_pinned())
+                end}},
+                group="input"
+            }
+        })
+    end,
+
+    find = function(selector, multiple)
+        if multiple then
+            return table.from_py(app.find_all(selector))
+        end
+
+        return app.find(selector)
+    end,
 
     initScope = function(hiddenScope)
         local innerScope = {}
@@ -109,15 +177,21 @@ sandbox = {
             _listeners = _listeners,
         }, {
             __index = function(t, k)
-                if innerScope[k] ~= nil then
-                    return innerScope[k]
+                local value = innerScope[k]
+
+                if value == nil then
+                    value = hiddenScope[k]
                 end
 
-                if hiddenScope[k] ~= nil then
-                    return hiddenScope[k]
+                if value == nil then
+                    value = builtins[k]
                 end
-                
-                return builtins[k]
+
+                if type(value) == "function" then
+                    builtins.setfenv(value, t)
+                end
+
+                return value
             end,
 
             __pairs = function(t)
@@ -208,6 +282,9 @@ def _multi_find(
 ) -> Widget | list[Widget] | None:
     """Finds widgets from the application."""
 
+    """
+    """
+
     if multiple:
         return lua.table_from([*app.find_all(selector)])
 
@@ -239,87 +316,8 @@ def _remove_and_callback_with(
     return False
 
 
-def _confirm(
-    app: "HttpApplication", title: str, body: str, callback: Callable[[bool], None]
-) -> None:
-    """Adds a confirmation dialogue."""
 
-    dialogue: widgets.Dialogue
-
-    dialogue = widgets.Dialogue(
-        widgets.Text(title, group="title"),
-        widgets.Text(body, group="body"),
-        widgets.Row(
-            widgets.Button(
-                "Confirm",
-                on_submit=[
-                    lambda _: _remove_and_callback_with(dialogue, callback, True)
-                ],
-            ),
-            widgets.Button(
-                "Deny",
-                on_submit=[
-                    lambda _: _remove_and_callback_with(dialogue, callback, False)
-                ],
-            ),
-            group="input",
-        ),
-    )
-    app.pin(dialogue)
-
-
-def _alert(app: "HttpApplication", text: str) -> None:
-    """Adds an alert dialogue."""
-
-    dialogue: widgets.Dialogue
-
-    def _remove(_: Widget) -> bool:
-        dialogue.remove_from_parent()
-
-        return True
-
-    dialogue = widgets.Dialogue(
-        widgets.Text(text, group="body"),
-        widgets.Row(
-            widgets.Button(
-                "Close",
-                on_submit=[_remove],
-            ),
-            group="input",
-        ),
-    )
-
-    app.pin(dialogue)
-
-
-def _prompt(
-    app: "HttpApplication",
-    title: str,
-    body: dict[int, Widget],
-    callback: Callable[[Widget], bool],
-) -> None:
-    """Adds a prompt dialogue with custom widgets."""
-
-    dialogue = widgets.Dialogue(
-        widgets.Text(title, group="title"),
-        widgets.Tower(*body.values(), group="body"),
-        widgets.Row(
-            widgets.Button(
-                "Submit",
-                on_submit=[
-                    lambda self: _remove_and_callback_with(
-                        dialogue, callback, self.parent
-                    )
-                ],
-            ),
-            group="input",
-        ),
-    )
-
-    app.pin(dialogue)
-
-
-def _widget_factory(typ: Type[Widget]) -> Callable[[LuaTable], Widget]:
+def _widget_factory(envs: LuaTable, typ: Type[Widget]) -> Callable[[LuaTable], Widget]:
     """Lets Lua instantiate widgets.
 
     ```
@@ -327,7 +325,14 @@ def _widget_factory(typ: Type[Widget]) -> Callable[[LuaTable], Widget]:
     ```
     """
 
+    setfenv = lua.globals().builtins.setfenv
+    getenv = lua.globals().sandbox.env
+
+    widget = None
+
     def _create(options: LuaTable) -> Widget:
+        nonlocal widget
+
         args = []
         kwargs = {}
 
@@ -346,9 +351,13 @@ def _widget_factory(typ: Type[Widget]) -> Callable[[LuaTable], Widget]:
                 else:
                     value = dict(value.items())
 
+            if callable(value):
+                value = _scope_func(value)
+
             kwargs[key] = value
 
-        return typ(*args, **kwargs)
+        widget = typ(*args, **kwargs)
+        return widget
 
     return _create
 
@@ -365,24 +374,25 @@ def init_runtime(runtime: LuaRuntime, app: "HttpApplication") -> None:
 
     runtime.execute(LUA_SCOPE_SETUP)
 
-    sandbox = lua.globals().sandbox
+    sandbox = runtime.globals().sandbox
+    runtime.globals().builtins.table.from_py = runtime.table_from
+
+    sandbox.app = app
+    sandbox.timeout = app.timeout
 
     sandbox.env = _env_getter(sandbox.envs)
+    sandbox.styles = LuaStyleWrapper
+    sandbox.chocl = parse_callback
+
     sandbox.zml = {
         "alias": zml_alias,
         "define": _zml_define,
         "escape": zml_escape,
         "expand_aliases": zml_expand_aliases,
     }
-    sandbox.timeout = app.timeout
-    sandbox.chocl = _chocl
-    sandbox.alert = partial(_alert, app)
-    sandbox.confirm = partial(_confirm, app)
-    sandbox.prompt = partial(_prompt, app)
-    sandbox.find = partial(_multi_find, app)
-    sandbox.styles = LuaStyleWrapper
     sandbox.w = {
-        key.title(): _widget_factory(value) for key, value in WIDGET_TYPES.items()
+        key.title(): _widget_factory(sandbox.envs, value)
+        for key, value in WIDGET_TYPES.items()
     }
 
 
