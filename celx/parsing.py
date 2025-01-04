@@ -98,9 +98,7 @@ def _extract_script(
         code += "_ENV = sandbox.envs[0]\n\n"
 
     code += indent(
-        LUA_SCRIPT_BEGIN.format(
-            script_id=node_to_id[node]
-        ),
+        LUA_SCRIPT_BEGIN.format(script_id=node_to_id[node]),
         level * 4 * " ",
     )
 
@@ -135,6 +133,7 @@ def _get_pairs(table: LuaTable) -> list[str]:
         yield (key, value)
         first_key = key
 
+
 # TODO: Technically rules is more like a `dict[str, dict[str, <something>]]`!
 def parse_widget(
     node: Element,
@@ -161,9 +160,7 @@ def parse_widget(
             node.append(script)
 
         for key, value in params.items():
-            script.text = script.text.replace(
-                f"${key}", node.get(key, default=value)
-            )
+            script.text = script.text.replace(f"${key}", node.get(key, default=value))
 
         slot = replacement.find("_slot")
 
@@ -256,7 +253,9 @@ def parse_widget(
         if child.tag == "script":
             continue
 
-        parsed, parsed_rules = parse_widget(child, components, parse_script=False, result=result)
+        parsed, parsed_rules = parse_widget(
+            child, components, parse_script=False, result=result
+        )
         rules.update(**parsed_rules)
         widget += parsed  # type: ignore
 
@@ -319,7 +318,10 @@ def parse_widget(
 
     return widget, rules
 
-def _register_component(node: Element, components: dict[str, str], namespace: str | None = None) -> None:
+
+def _register_component(
+    node: Element, components: dict[str, str], namespace: str | None = None
+) -> None:
     name = None
     params = {}
 
@@ -337,6 +339,7 @@ def _register_component(node: Element, components: dict[str, str], namespace: st
         name = namespace + "." + name
 
     components[name] = params, node[0]
+
 
 def parse_page(node: Element, components: dict[str, str]) -> Page:
     """Parses a page, its scripts & its children from XML node."""

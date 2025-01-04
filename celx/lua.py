@@ -321,7 +321,6 @@ def _remove_and_callback_with(
     return False
 
 
-
 def _widget_factory(envs: LuaTable, typ: Type[Widget]) -> Callable[[LuaTable], Widget]:
     """Lets Lua instantiate widgets.
 
@@ -400,7 +399,9 @@ def init_runtime(runtime: LuaRuntime, app: "HttpApplication") -> None:
         for key, value in WIDGET_TYPES.items()
     }
 
-    runtime.execute(dedent("""
+    runtime.execute(
+        dedent(
+            """
         do table.insert(sandbox.stack, _ENV)
             scope = {}
             for k, v in pairs(sandbox) do
@@ -409,7 +410,9 @@ def init_runtime(runtime: LuaRuntime, app: "HttpApplication") -> None:
 
             sandbox.envs[0] = sandbox.initScope(scope)
         end
-    """))
+    """
+        )
+    )
 
 
 class LoggedLuaRuntime(LuaRuntime):
