@@ -105,7 +105,7 @@ sandbox = {
             w.Text{text, group="body"},
             w.Row{
                 w.Button{"Close", on_submit={
-                    function() app.remove_pinned() end
+                    function() app.unpin_last() end
                 }},
                 group="input",
             }
@@ -120,14 +120,14 @@ sandbox = {
                 w.Button{
                     "Confirm",
                     on_submit={function()
-                        app.remove_pinned()
+                        app.unpin_last()
                         callback(true)
                     end}
                 },
                 w.Button{
                     "Deny",
                     on_submit={function()
-                        app.remove_pinned()
+                        app.unpin_last()
                         callback(false)
                     end}
                 },
@@ -142,7 +142,7 @@ sandbox = {
             w.Tower{group="body", table.unpack(body)},
             w.Row{
                 w.Button{"Submit", on_submit={function()
-                    callback(app.remove_pinned())
+                    callback(app.unpin_last())
                 end}},
                 group="input"
             }

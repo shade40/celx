@@ -8,6 +8,7 @@ from xml.dom.minidom import parseString
 from xml.parsers.expat import ExpatError
 
 from celadon import Application, Page, Widget, Container
+from zenith import zml_escape
 from requests import Session
 
 from .parsing import parse_widget, parse_page
@@ -67,6 +68,11 @@ class HttpApplication(Application):
 
         return self._session
 
+    def __getitem__(self, item: Any) -> Any:
+        """Implement `__getitem__` for Lua attribute access."""
+
+        return getattr(self, item)
+
     def _error(self, error: Exception) -> None:
         self.stop()
 
@@ -118,6 +124,7 @@ class HttpApplication(Application):
             try:
                 _ = parseString(xml)
             except ExpatError:
+                xml = zml_escape(xml)
                 xml = f"<text>{xml}</text>"
 
             tree = ElementTree(xml)
@@ -199,7 +206,7 @@ class HttpApplication(Application):
                     self._error(ValueError("no widget in response"))
                     return
 
-            result, rules = parse_widget(xml)
+            result, rules = parse_widget(xml, self._registered_components)
 
             if self.page is None:
                 return
