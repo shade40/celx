@@ -1,5 +1,5 @@
 import re
-from lxml.etree import Element, tostring as element_to_string
+from lxml.etree import Element, fromstring, tostring
 
 import lupa
 from copy import deepcopy
@@ -159,9 +159,6 @@ def parse_widget(
 
             node.append(script)
 
-        for key, value in params.items():
-            script.text = script.text.replace(f"${key}", node.get(key, default=value))
-
         slot = replacement.find("_slot")
 
         if slot is not None:
@@ -175,6 +172,13 @@ def parse_widget(
 
         parent = node.getparent()
         idx = [*parent].index(node)
+
+        text = tostring(replacement).decode()
+
+        for key, value in params.items():
+            text = text.replace(f"${key}", node.get(key, default=value))
+
+        replacement = fromstring(text.encode())
 
         node = replacement
         parent[idx] = replacement
