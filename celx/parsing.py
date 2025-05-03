@@ -21,9 +21,12 @@ do table.insert(stack, _ENV)
     _ENV = initScope(_ENV)
     env_id = {script_id}
 
+    -- USER CODE BEGIN
 """
 
 LUA_SCRIPT_END = """
+    -- USER CODE END
+
 envs[{script_id}] = _ENV
 end _ENV = table.remove(stack)
 if _children then table.insert(_children, envs[{script_id}]) end
