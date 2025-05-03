@@ -155,7 +155,7 @@ def parse_widget(
 
         if script is None:
             script = Element("script")
-            script.text = ""
+            script.text = " "
 
             node.append(script)
 

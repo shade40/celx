@@ -216,10 +216,10 @@ sandbox = {
             __newindex = function(t, k, v)
                 local current = hiddenScope[k]
 
-                if current ~= nil then
-                    hiddenScope[k] = v
-                else
+                if current == nil or builtins.type(current) == "function" then
                     innerScope[k] = v
+                else
+                    hiddenScope[k] = v
                 end
 
                 if current ~= v and _listeners[k] ~= nil then

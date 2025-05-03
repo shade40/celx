@@ -31,7 +31,7 @@ classifiers = [
   "Topic :: Terminals",
   "Topic :: Text Processing :: Markup",
 ]
-dependencies = ["sh40-celadon", "requests", "lxml"]
+dependencies = ["sh40-celadon", "requests", "lxml", "lupa"]
 dynamic = ["version"]
 
 [project.urls]

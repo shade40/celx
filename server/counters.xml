@@ -1,15 +1,19 @@
 <complib namespace="form">
-    <component name="counter" value="0" min="0" max="10">
+    <component name="counter" initial="0" min="0" max="10">
         <row eid="friend">
             <style>
                 gap: 1
                 height: shrink
             </style>
             <script>
-                value = $value
+                value = $initial
 
                 function add(num)
                     value = math.min(math.max(value + num, $min), $max)
+                end
+
+                function init()
+                    on_change("value", function() count = count + 1 end)
                 end
             </script>
             <_slot />

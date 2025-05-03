@@ -70,48 +70,12 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
                 GCount: [!threshold(g_count,main.success,10,main.error)]$g_count[/]
                 [!random(0,100)]Random: %i[/]
             </text>
-            <tower pre-content="drawcount = drawcount + 1">
-                <script> drawcount = 0 </script>
-                <text>Drawn: $drawcount times</text>
-                <style> frame: rounded </style>
-                <field name="content" multiline="true">
-                </field>
-                <button on-submit=":POST /lua; SWAP IN #output">Run</button>
-                <tower eid="output"></tower>
-            </tower>
-            <form.counter value="2" max="20"/>
             <form.counters>
-                <text>[bold]This is a title</text>
-                <form.counter value="69"/>
+                <text>[bold]Multiple counters</text>
+                <form.counter initial="69"></form.counter>
+                <form.counter initial="2" max="20"/>
+                <form.counter initial="420"/>
             </form.counters>
-            <row>
-                <style>
-                    alignment: [center, start]
-                    gap: 1
-                    width: shrink
-                </style>
-                <script>
-                    count = 0
-                </script>
-                <button on-submit="count = count - 1">
-                    Remove!
-                </button>
-                <text>Clicked $count times</text>
-
-                <button on-submit="count = count + 1"> Add! </button>
-
-                <button>
-                    Add
-                    <script>
-                        function on_submit()
-                            count = count + 1
-                        end
-                    </script>
-                </button>
-
-                <button on-submit=":POST /add; SWAP IN self"> Submit </button>
-
-            </row> 
             <text>[bold]Imagine this is a form</text>
             <button
                 on-submit="
@@ -124,7 +88,6 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
                 <script> dialogue = false </script>
                 test $dialogue
             </button>
-
             <tower>
                 <style>
                     width: 80
@@ -153,11 +116,11 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
                     <style>
                         height: 10
                     </style>
-<?php for ($i = 0; $i < 10; $i++): ?>
+                    <?php for ($i = 0; $i < 10; $i++): ?>
                     function on_submit(env)
                         count = count + 1
                     end
-<?php endfor; ?>
+                    <?php endfor; ?>
                 </field>
             </tower> 
         </tower> 
