@@ -1,15 +1,18 @@
 from argparse import ArgumentParser
 
-from . import HttpApplication
+from . import Browser
 from slate import feed
 
 
 def run(endpoint: str):
     """Runs the application at the given endpoint."""
 
-    with HttpApplication(endpoint, title="celx") as app:
+    with Browser(endpoint, title="celx") as app:
         ...
 
+    root = app.find("#root")
+    print(root.children[0].content)
+    print(app.dump_rules_applied_to(root.children[0].content))
 
 def main() -> None:
     """The main entrypoint."""

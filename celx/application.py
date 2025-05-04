@@ -7,7 +7,7 @@ from lxml.etree import fromstring as ElementTree, Element
 from xml.dom.minidom import parseString
 from xml.parsers.expat import ExpatError
 
-from celadon import Application, Page, Widget, Container
+from celadon import Application, Page, Widget, Container, Tower, Row, Text, Field, Button
 from zenith import zml_escape
 from requests import Session
 
@@ -21,7 +21,7 @@ from .callbacks import (
 from .lua import lua, init_runtime
 
 
-__all__ = ["HttpApplication"]
+__all__ = ["Browser"]
 
 
 def threaded(func: Callable[..., None]) -> Callable[..., None]:
@@ -34,7 +34,7 @@ def threaded(func: Callable[..., None]) -> Callable[..., None]:
     return _inner
 
 
-class HttpApplication(Application):
+class Browser(Application):
     """An application class for HTTP pages."""
 
     def __init__(self, domain: str, **app_args: Any) -> None:
@@ -51,6 +51,25 @@ class HttpApplication(Application):
             "CELX_Request": "true",
         }
         self._current_instructions: list[list[Instruction]] = []
+
+        location = Field("http://test.com", eid="location")
+        location.bind("return", lambda _: self.route(location.value))
+
+        self.content = Tower(
+            Row(
+                Text("celx v1.0"),
+                Row(
+                    location,
+                    Button("<"),
+                    Button(">"),
+                    Button("⟳ ", on_submit=[lambda _: self.route(location.value)]),
+                    eid="location-bar",
+                ),
+                Text(""),
+                eid="chrome"
+            ),
+            Tower(eid="root"),
+        )
 
         def _clear_instructions(_: Page) -> bool:
             for instructions in self._current_instructions:
@@ -112,10 +131,7 @@ class HttpApplication(Application):
                 self.stop()
                 resp.raise_for_status()
 
-            url = urlparse(endpoint)
-
-            if url.netloc != self._url.netloc:
-                self._url = url
+            self._url = urlparse(endpoint)
 
             # Wrap invalid XML as text
             # TODO: Treat response differently based on Content-Type
@@ -161,13 +177,47 @@ class HttpApplication(Application):
         """Routes to a page loaded from the given XML."""
 
         try:
-            page = parse_page(node, self._registered_components)
+            page_node = node.find("page")
+
+            if page_node is None:
+                raise ValueError("no <page /> node found.")
+
+            page = Page(self.content, **page_node.attrib, rules="""
+                Row#chrome:
+                    height: 1
+                    frame: [padded, null, padded, null]
+
+                Row#location-bar:
+                    gap: 1
+                    width: shrink
+
+                Field#location:
+                    width: 60
+                    fill_style: '@main.panel1'
+
+                Tower#root:
+                    fill_style: '@blue'
+                    gap: 1
+            """)
+
+            widget, scripts = parse_page(page_node, self._registered_components, page)
+
+            for script in scripts:
+                lua.execute(script)
+
+            root = self.find("#root", scope=self.content)
+            root.update_children([widget])
+
+            page.remove(self.content)
+            page.append(self.content)
 
         except Exception as exc:  # pylint: disable=broad-exception-caught
             self._error(exc)
             return
 
-        page.route_name = self._url.path
+        page.route_name = self._url.geturl()
+        location = self.find("#location", scope=self.content)
+        location.value = self._url.geturl()
 
         # TODO: We don't have to request the page every time we go to it
         self.append(page)
@@ -183,6 +233,7 @@ class HttpApplication(Application):
             self._terminal.set_title(page.title)
 
         self.apply_rules()
+        self.page._rules_changed = True
 
     @threaded
     def run_instructions(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -215,6 +266,9 @@ class HttpApplication(Application):
             #       like when a future "DELETE" instruction is added.
             for selector, rule in rules.items():
                 self.page.rule(selector, **rule)
+
+            with open("log", "a") as f:
+                f.write(str(rules) + "\n")
 
         self._current_instructions.append(instructions)
 

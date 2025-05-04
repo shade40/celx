@@ -1,1 +1,1 @@
-from .application import HttpApplication
+from .application import Browser

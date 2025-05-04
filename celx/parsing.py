@@ -348,16 +348,16 @@ def _register_component(
     components[name] = params, node[0]
 
 
-def parse_page(node: Element, components: dict[str, str]) -> Page:
+def parse_page(page_node: Element, components: dict[str, str], page: Page) -> tuple[Widget | None, list[str]]:
     """Parses a page, its scripts & its children from XML node."""
 
-    page_node = node.find("page")
+    content_nodes = [node for node in page_node if node.tag not in ["component", "complib", "style", "script"]]
 
-    if page_node is None:
-        raise ValueError("no <page /> node found.")
+    if len(content_nodes) > 1:
+        raise ValueError("pages must have exactly one content node.", content_nodes)
 
-    # Init args aren't strongly typed
-    page = Page(**page_node.attrib)  # type: ignore
+    root = None
+    scripts = [];
 
     for child in page_node:
         if child.tag == "complib":
@@ -372,18 +372,26 @@ def parse_page(node: Element, components: dict[str, str]) -> Page:
             _register_component(child, components)
             continue
 
-        if child.tag in WIDGET_TYPES or child.tag in components:
-            widget, rules = parse_widget(child, components)
-            page += widget
-
-            for selector, rule in rules.items():
+        if child.tag == "style":
+            for selector, rule in parse_rules(child.text or "").items():
                 page.rule(selector, **rule)
 
-        elif child.tag == "style":
-            for selector, rule in parse_rules(child.text or "").items():
+            continue
+
+        if child.tag == "script":
+            scripts.append("_ENV = sandbox.envs[0]\n" + dedent(child.text))
+            continue
+
+        if child.tag in WIDGET_TYPES or child.tag in components:
+            root, rules = parse_widget(child, components)
+
+            for selector, rule in rules.items():
+                with open("log", "a") as f:
+                    f.write(selector + " => " + str(rule) + "\n")
+
                 page.rule(selector, **rule)
 
         else:
             raise ValueError(child.tag)
 
-    return page
+    return root, scripts
