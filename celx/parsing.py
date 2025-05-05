@@ -386,9 +386,6 @@ def parse_page(page_node: Element, components: dict[str, str], page: Page) -> tu
             root, rules = parse_widget(child, components)
 
             for selector, rule in rules.items():
-                with open("log", "a") as f:
-                    f.write(selector + " => " + str(rule) + "\n")
-
                 page.rule(selector, **rule)
 
         else:

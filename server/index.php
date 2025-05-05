@@ -25,7 +25,7 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
         <tower>
             <style>
                 alignment: [center, center]
-                frame: rounded
+                frame: [padded, heavy, padded, padded]
                 gap: 1
             </style>
             <script>
@@ -54,6 +54,19 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
                     end)
                 end
             </script>
+            <row>
+                <style>
+                    height: 1
+                    width: shrink
+                    gap: 1
+                </style>
+                <link to="/">Main</link>
+                <link to="/test">Test</link>
+                <button>
+                    <script> function on_submit() alert(zml.escape(tostring(app.history))) end </script>
+                    history
+                </button>
+            </row>
             <?php if ($_SERVER["REQUEST_URI"] == "/test"): ?>
             <text>[bold red]TEST PAGE</text>
             <?php endif; ?>
@@ -72,14 +85,16 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
             <text>[bold]Imagine this is a form</text>
             <button
                 on-submit="
-                    confirm('A question?', 'soething', function()
-                        dialogue = true
-                        alert(self)
+                    confirm('DJ Crazy Times', 'If you want parties to be making?\n...have some noise!', function(result)
+                        if result then
+                            alert('Women are my favorite guy! &lt;3')
+                        else
+                            alert('The rythm is not glad.')
+                        end
                     end)
                 "
             >
-                <script> dialogue = false </script>
-                test $dialogue
+                Alert alert
             </button>
         </tower> 
     </page>

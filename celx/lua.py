@@ -387,6 +387,7 @@ def init_runtime(runtime: LuaRuntime, app: "HttpApplication") -> None:
     sandbox.env = _env_getter(sandbox.envs)
     sandbox.styles = LuaStyleWrapper
     sandbox.chocl = parse_callback
+    sandbox.len = len
 
     sandbox.zml = {
         "alias": zml_alias,

@@ -1,6 +1,8 @@
 from functools import wraps
-from typing import Any, Callable
+from pathlib import Path
 from threading import Thread
+from time import time
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 from lxml.etree import fromstring as ElementTree, Element
@@ -45,29 +47,20 @@ class Browser(Application):
         self._registered_components = {}
         self._page = Page()
         self._url = urlparse(domain)
+        self.url = self._url.geturl()
+        self.history = []
+        self.history_offset = 0
         self._session = Session()
         self._session.headers = {
             "Accepts": "text/celx",
             "CELX_Request": "true",
         }
+
         self._current_instructions: list[list[Instruction]] = []
 
-        location = Field("http://test.com", eid="location")
-        location.bind("return", lambda _: self.route(location.value))
 
         self.content = Tower(
-            Row(
-                Text("celx v1.0"),
-                Row(
-                    location,
-                    Button("<"),
-                    Button(">"),
-                    Button("⟳ ", on_submit=[lambda _: self.route(location.value)]),
-                    eid="location-bar",
-                ),
-                Text(""),
-                eid="chrome"
-            ),
+            self._build_chrome(),
             Tower(eid="root"),
         )
 
@@ -80,6 +73,30 @@ class Browser(Application):
         self.on_page_changed += _clear_instructions
 
         self.route(self._url.geturl())
+
+    def _build_chrome(self) -> Widget:
+        with open(Path(__file__).parents[0] / "default_chrome.xml", "r") as f:
+            xml = ElementTree(f.read())
+            default_chrome, scripts = parse_page(xml, self._registered_components, self)
+
+            for script in scripts:
+                lua.execute(script)
+
+        user_chrome = None
+        user_chrome_path = (Path.home() / ".config" / "celx" / "chrome.xml")
+
+        if user_chrome_path.exists():
+            with open(user_chrome_path, "r") as f:
+                xml = ElementTree(f.read())
+
+                if "disabled" not in xml.attrib:
+                    user_chrome, scripts = parse_page(xml, self._registered_components, self)
+
+                    for script in scripts:
+                        lua.execute(script)
+
+        return user_chrome or default_chrome
+
 
     @property
     def session(self) -> Session:
@@ -132,6 +149,7 @@ class Browser(Application):
                 resp.raise_for_status()
 
             self._url = urlparse(endpoint)
+            self.url = self._url.geturl()
 
             # Wrap invalid XML as text
             # TODO: Treat response differently based on Content-Type
@@ -182,33 +200,18 @@ class Browser(Application):
             if page_node is None:
                 raise ValueError("no <page /> node found.")
 
-            page = Page(self.content, **page_node.attrib, rules="""
-                Row#chrome:
-                    height: 1
-                    frame: [padded, null, padded, null]
-
-                Row#location-bar:
-                    gap: 1
-                    width: shrink
-
-                Field#location:
-                    width: 60
-                    fill_style: '@main.panel1'
-
-                Tower#root:
-                    fill_style: '@blue'
-                    gap: 1
-            """)
+            page = Page(**page_node.attrib)
 
             widget, scripts = parse_page(page_node, self._registered_components, page)
 
             for script in scripts:
                 lua.execute(script)
 
-            root = self.find("#root", scope=self.content)
-            root.update_children([widget])
+            self.content = Tower(
+                self._build_chrome(),
+                Tower(widget, eid="root"),
+            )
 
-            page.remove(self.content)
             page.append(self.content)
 
         except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -216,8 +219,6 @@ class Browser(Application):
             return
 
         page.route_name = self._url.geturl()
-        location = self.find("#location", scope=self.content)
-        location.value = self._url.geturl()
 
         # TODO: We don't have to request the page every time we go to it
         self.append(page)
@@ -394,9 +395,26 @@ class Browser(Application):
 
         self._current_instructions.remove(instructions)
 
-    def route(self, destination: str) -> None:
+    def route(self, destination: str, no_history: bool = False) -> None:
         """Routes to the given URL."""
+
+        if not no_history:
+            self.history.append(destination)
+            self.history_offset = 0
 
         destination = self._prefix_endpoint(destination)
 
         self._http(HTTPMethod.GET, destination, {}, self._xml_page_route)
+
+    def refresh(self) -> None:
+        """Reloads the current URL."""
+
+        self._http(HTTPMethod.GET, self.url, {}, self._xml_page_route)
+
+    def back(self) -> None:
+        self.history_offset = min(self.history_offset + 1, len(self.history) - 1)
+        self.route(self.history[-self.history_offset-1], no_history=True)
+
+    def forward(self) -> None:
+        self.history_offset = max(self.history_offset - 1, 0)
+        self.route(self.history[-self.history_offset-1], no_history=True)
