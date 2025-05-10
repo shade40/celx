@@ -7,6 +7,9 @@ from slate import feed
 def run(endpoint: str):
     """Runs the application at the given endpoint."""
 
+    with open("debug.lua", "w") as f:
+        ...
+
     with Browser(endpoint, title="celx") as app:
         ...
 

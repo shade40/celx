@@ -60,6 +60,20 @@ $primary = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
                         frame: [null, null, light, null]
                         gap: 1
                     </style>
+                    <button>
+                        <script>
+                            function on_submit()
+                                if 1 or 2 then
+                                    print('one')
+                                else
+                                    print('two')
+                                end
+
+                                error('test')
+                            end
+                        </script>
+                        Error
+                    </button>
                     <row>
                         <style>
                             height: 1

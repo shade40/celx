@@ -3,6 +3,7 @@ from lxml.etree import Element, fromstring, tostring
 
 import lupa
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import Any, Callable
 from textwrap import indent, dedent
 
@@ -34,6 +35,44 @@ if _children then table.insert(_children, envs[{script_id}]) end
 """
 
 EVENT_PREFIXES = ("on", "pre")
+
+RE_ERROR_LINENO = re.compile('\[string "<python>"\]:(\d+):')
+
+@dataclass
+class RuntimeError(Exception):
+    funcname: str
+    widget: Widget
+    code: str
+    exc: lupa.LuaError
+
+    lineno: int = -1
+
+    def __post_init__(self):
+        if (match := RE_ERROR_LINENO.search(str(self.exc))) is None:
+            return
+
+        self.lineno = int(match[1]) - 1
+
+    def __str__(self):
+        dedented = dedent("\n".join(self.code.splitlines()[self.lineno - 4 : self.lineno + 5]))
+        lines = indent(dedented, 2 * " ").splitlines()
+
+        lines[4] = "> " + dedented.splitlines()[4]
+
+        start = None
+        end = None
+
+        for i, line in enumerate(lines):
+            if "-- USER CODE BEGIN" in line:
+                start = i
+                continue
+
+            if "-- USER CODE END" in line:
+                end = i
+
+        snippet = "\n".join(lines[start:end])
+
+        return f"error in '{self.funcname}'\n\n{self.widget.as_query()}:\n\n" + dedent(snippet)
 
 # TODO: This breaks `width: shrink` for text
 def lua_formatted_get_content(scope: dict[str, Any]) -> Callable[[Widget], list[str]]:
@@ -317,13 +356,25 @@ def parse_widget(
 
                 assert callable(value)
 
-                event += value
+                event += _report_env_id(value, s_id, code, widget, key)
 
         # Set formatted get content for the widget
         get_content = lua_formatted_get_content(env)
         widget.get_content = get_content.__get__(widget, widget.__class__)  # type: ignore
 
     return widget, rules
+
+def _report_env_id(callback, env_id, code, widget, key):
+    """Wraps a function and reports its environment id with exceptions it raises."""
+
+    def _inner(*args, **kwargs):
+        try:
+            return callback(*args, **kwargs)
+
+        except Exception as e:
+            raise RuntimeError(key, widget, code, e)
+
+    return _inner
 
 
 def _register_component(

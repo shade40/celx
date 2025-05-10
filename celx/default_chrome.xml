@@ -43,9 +43,6 @@
             
             .expanded:
                 height: 1
-
-            /hover:
-                height: 1
         </style>
         <text>
             <script>

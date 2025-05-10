@@ -10,8 +10,8 @@ from xml.dom.minidom import parseString
 from xml.parsers.expat import ExpatError
 
 from celadon import Application, Page, Widget, Container, Tower, Row, Text, Field, Button
-from zenith import zml_escape
 from requests import Session
+from zenith import zml_escape
 
 from .parsing import parse_widget, parse_page
 from .callbacks import (
